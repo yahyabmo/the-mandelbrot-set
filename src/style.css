@@ -190,6 +190,152 @@ body.ui-hidden .reticle {
   filter: drop-shadow(0 0 4px rgba(239, 200, 121, 0.5));
 }
 
+/* ---------- the odyssey ---------- */
+.story-toggle {
+  top: var(--gap);
+  right: calc(var(--gap) + 96px);
+  height: 40px;
+  padding: 0 16px;
+  font: 500 11px var(--body);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  cursor: pointer;
+  z-index: 3;
+}
+.story-toggle[aria-expanded="true"] {
+  color: var(--accent);
+  border-color: rgba(239, 200, 121, 0.55);
+}
+.chapter {
+  left: var(--gap);
+  top: 112px;
+  width: 352px;
+  max-height: calc(100vh - 112px - 262px);
+  overflow-y: auto;
+  margin: 0;
+  padding: 16px 20px 16px;
+  z-index: 2;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+  animation: chapter-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+body.story-open .gauge {
+  opacity: 0;
+  pointer-events: none;
+}
+.chapter-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.chapter-kicker {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+}
+.chapter-close {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--rule-strong);
+  background: transparent;
+  color: var(--ink-soft);
+  font: 400 16px/1 var(--body);
+  cursor: pointer;
+}
+.chapter-close:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.chapter-title {
+  margin: 8px 0 10px;
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+.chapter-body p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.chapter-body em {
+  font-family: var(--display);
+  font-size: 1.08em;
+  color: var(--ink);
+}
+.chapter-task {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 10px;
+  align-items: start;
+  margin: 4px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(239, 200, 121, 0.45);
+  background: var(--accent-soft);
+}
+.chapter-task p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.task-mark {
+  width: 12px;
+  height: 12px;
+  margin-top: 3px;
+  border: 1px solid var(--accent);
+}
+.chapter-task.done .task-mark {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(239, 200, 121, 0.7);
+}
+.chapter-task.done p {
+  color: var(--accent);
+}
+.chapter-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.chapter-nav .action:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.chapter-dots {
+  display: flex;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chapter-dots button {
+  display: block;
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 1px solid var(--rule-strong);
+  background: transparent;
+  cursor: pointer;
+}
+.chapter-dots button:hover {
+  border-color: var(--ink);
+}
+.chapter-dots button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+@keyframes chapter-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
 /* ---------- index panel ---------- */
 .panel-toggle {
   top: var(--gap);
@@ -808,6 +954,26 @@ body.panel-closed .lens {
   .readout dl dd:nth-of-type(n + 3) {
     display: none;
   }
+  .story-toggle {
+    right: calc(var(--gap) + 88px);
+    padding: 0 12px;
+  }
+  /* The story becomes a sheet at the bottom of the screen. */
+  .chapter {
+    top: auto;
+    left: var(--gap);
+    right: var(--gap);
+    bottom: var(--gap);
+    width: auto;
+    max-height: 48vh;
+    padding: 12px 14px;
+  }
+  .chapter-title {
+    font-size: 24px;
+  }
+  body.story-open .panel {
+    transform: translateY(calc(100% + var(--gap) * 2));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -816,13 +982,15 @@ body.panel-closed .lens {
   .toast,
   .gauge-mark,
   .lens,
+  .chapter,
   .toggle,
   .action,
   .picker-button,
   .picker-chevron {
     transition: none;
   }
-  .picker-list {
+  .picker-list,
+  .chapter {
     animation: none;
   }
 }

@@ -28,6 +28,28 @@
       </div>
     </div>
 
+    <button class="plate story-toggle" id="story-toggle" type="button" aria-expanded="false" aria-controls="chapter">
+      <span>Odyssey</span>
+    </button>
+
+    <article class="plate chapter" id="chapter" hidden>
+      <header class="chapter-head">
+        <span class="chapter-kicker" id="chapter-kicker"></span>
+        <button type="button" class="chapter-close" id="chapter-close" aria-label="Close the odyssey">×</button>
+      </header>
+      <h1 class="chapter-title" id="chapter-title"></h1>
+      <div class="chapter-body" id="chapter-body"></div>
+      <div class="chapter-task" id="chapter-task" aria-live="polite">
+        <span class="task-mark" aria-hidden="true"></span>
+        <p id="chapter-task-text"></p>
+      </div>
+      <nav class="chapter-nav" aria-label="Chapters">
+        <button type="button" class="action" id="chapter-prev">Previous</button>
+        <ol class="chapter-dots" id="chapter-dots"></ol>
+        <button type="button" class="action" id="chapter-next">Next</button>
+      </nav>
+    </article>
+
     <button class="plate panel-toggle" id="panel-toggle" type="button" aria-label="Show or hide the index" aria-expanded="true">
       <span>Index</span>
     </button>

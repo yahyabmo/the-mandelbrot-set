@@ -5,7 +5,8 @@ import { autoIterations } from "./math/iterations";
 import { toDecimal, toNumber } from "./math/fixed";
 import { ease, flightPath, HOME_WIDTH, homeView, inSight, MIN_WIDTH, panBy, settled, zoomAt, zoomRate, type View } from "./math/view";
 import { PLACES, type Place } from "./places";
-import { Renderer } from "./render/renderer";
+import { Renderer, type Status } from "./render/renderer";
+import { Story } from "./story/story";
 import { coordinateText, magnificationHtml, scientificText, superscript } from "./ui/format";
 import { decode, encode } from "./url";
 
@@ -266,6 +267,29 @@ canvas.addEventListener("pointermove", (e) => {
 });
 canvas.addEventListener("pointerleave", () => atlas.setPointer(null));
 
+let lastStatus: Status | null = null;
+const story = new Story({
+  atlas,
+  flyTo: (v) => {
+    flyTo(v);
+    state.place = null;
+    inertia = { x: 0, y: 0 };
+    syncPanel();
+  },
+  size,
+  setPalette: (id) => {
+    state.palette = paletteById(id);
+    syncPanel();
+  },
+  context: () => ({ reference: lastStatus?.reference ?? "none", width: state.current.width }),
+  changed: () => (urlAt = 0),
+});
+/** "#chapter=3" opens the third chapter of the story. */
+const chapterIn = (hash: string) => {
+  const m = /^#chapter=(\d+)$/.exec(hash);
+  return m ? Number(m[1]) - 1 : null;
+};
+
 let toastTimer = 0;
 function toast(text: string): void {
   const t = $("toast");
@@ -295,6 +319,12 @@ function copyLink(): void {
 
 // A link pasted into the address bar of an open tab takes effect at once.
 window.addEventListener("hashchange", () => {
+  const chapter = chapterIn(location.hash);
+  if (chapter !== null) {
+    if (chapter !== story.chapter) story.open(chapter);
+    return;
+  }
+  story.close();
   const s = decode(location.hash, { view: state.target, palette: state.palette.id, density: state.density, offset: state.offset, detail: state.detail });
   flyTo(s.view);
   state.palette = paletteById(s.palette);
@@ -393,6 +423,12 @@ window.addEventListener("keydown", (e) => {
   const [w, h] = size();
   const step = 0.12 * w;
   const pan = (dx: number, dy: number) => (state.target = panBy(state.target, dx, dy, w));
+  if (story.chapter !== null && (e.key === "Escape" || e.key === "PageDown" || e.key === "PageUp")) {
+    e.preventDefault();
+    if (e.key === "Escape") story.close();
+    else story.step(e.key === "PageDown" ? 1 : -1);
+    return;
+  }
   switch (e.key) {
     case "ArrowLeft":
       pan(step, 0);
@@ -519,6 +555,8 @@ function frame(now: number): void {
   });
   renderer.adapt(Math.min(100, elapsed));
   atlas.frame();
+  lastStatus = status;
+  story.frame();
 
   if (state.captureSince) {
     const ready = status.sharp && (!allowSamples || status.samples >= CAPTURE_SAMPLES);
@@ -558,13 +596,16 @@ function frame(now: number): void {
   }
   if (!moving && now - urlAt > 500) {
     urlAt = now;
-    const hash = shareHash();
+    // While the story is open, the link points at its chapter.
+    const hash = story.chapter !== null ? `#chapter=${story.chapter + 1}` : shareHash();
     if (hash !== location.hash) history.replaceState(null, "", hash);
   }
   requestAnimationFrame(frame);
 }
 
 syncPanel();
+const firstChapter = chapterIn(location.hash);
+if (firstChapter !== null) story.open(firstChapter);
 setTimeout(() => $("hint").classList.add("gone"), 12000);
 requestAnimationFrame(frame);
 
@@ -574,6 +615,8 @@ requestAnimationFrame(frame);
   renderer,
   goTo,
   PLACES,
+  story,
+  atlas,
   /** The current view in plain numbers, for scripts that cannot read bigints. */
   here: () => ({ re: toNumber(state.current.cx), im: toNumber(state.current.cy), width: state.current.width }),
   /** The current centre with every digit. */
