@@ -1,6 +1,6 @@
 # Mandelbrot Odyssey
 
-A real-time journey into the Mandelbrot set, computed live on your graphics card. Scroll into a spiral, fly to the famous places of the set, change the colours as you go, and dive to a magnification of 10³⁰⁰, smoothly.
+A real-time journey into the Mandelbrot set, computed live on your graphics card. Scroll into a spiral, fly to the famous places of the set, dive to a magnification of 10³⁰⁰, smoothly, and read the mathematics of what you see in a live atlas: Julia sets, orbits, periods, external rays, and π.
 
 ## Installation
 
@@ -56,7 +56,15 @@ npm start
 
 ![The whole Mandelbrot set, with the index of places and colours](docs/screenshots/home.jpg)
 
-*The whole set. On the right, the index: places, palettes, detail. On the left, the depth gauge, from 10⁰ to 10³⁰⁰, and the readout of the engine at work.*
+*The whole set. On the right, the index: places, atlas, palettes, detail. On the left, the depth gauge, from 10⁰ to 10³⁰⁰, and the readout of the engine at work. At the bottom, the lens: the Julia set of the point under the pointer, here c = −3/4.*
+
+![The atlas: the Julia set of the period-3 bulb, its external rays and Lavaurs' diagram](docs/screenshots/atlas.jpg)
+
+*The atlas. The pointer is in the bulb of period 3 at the top: the lens shows its Julia set, Douady's rabbit, and the orbit of 0 settling on a cycle of 3 points. The ring marks the component, and the rays 1/7 and 2/7, which land at its root, are lit, along with their chord in Lavaurs' diagram.*
+
+![The π experiment in the neck of seahorse valley](docs/screenshots/pi.jpg)
+
+*π in the Mandelbrot set. At c = −3/4 + iε, the steps before escape times ε tend to π, digit after digit, as the table on the right shows.*
 
 ![The index of places, open](docs/screenshots/places.jpg)
 
@@ -87,6 +95,7 @@ npm start
 
 - **Zoom anywhere, as deep as 10³⁰⁰.** Scroll or pinch to zoom around the pointer, drag to move, and let go to glide. Double-click dives four times closer, <kbd>Shift</kbd> + double-click goes back. The point under the pointer stays exactly where it is all along the zoom.
 - **Fly to famous places.** Seahorse valley, a double spiral, elephant valley, a minibrot copy of the whole set, the dendrite at c = i, the end of the original 2023 script at 10¹⁸, and the bottom of the map at 10²⁹⁰. A flight to a place out of sight first pulls back until it is in view, then dives, faster the deeper it goes: 10¹⁸ in about five seconds, 10²⁹⁰ in under twenty.
+- **Read the atlas.** Move the pointer and the lens shows the Julia set of that point, with the orbit of 0 drawn on it: connected inside the set, dust outside. The component under the pointer is ringed, with its period and size, found by Newton's method. Turn on the external rays to see the rays of every component up to period 6, labelled by their angles, and Lavaurs' diagram, the map of how they pair: pick a chord and the explorer flies to its component. The π experiment shows why π appears in seahorse valley and at the cusp.
 - **Colour it.** Seven palettes, including *Turbo 2023*, the colours of the original script: 150 steps of Turbo, up and back down. Change the density and the shift, or let the colours flow. Colours change instantly, without recomputing the image.
 - **Always smooth.** While you move, the image is computed at a lower resolution that fits in the frame budget. When you stop, it sharpens, then smooths its edges with up to 12 samples per pixel.
 - **Share it.** The address always holds the current view: copy the link and anyone opens the same place, with the same colours. Save the image as a PNG.
@@ -121,6 +130,8 @@ Graphics cards compute in 32-bit floats, which blur the image past a magnificati
 
 **Speed.** On an integrated AMD Radeon (Ryzen 7 5825U), measured in Chrome: during flights to 10⁵, 10¹⁸ and 10²⁹⁰ and back, one frame in about 3800 took longer than a screen refresh while the view was moving. A full image at 10²⁹⁰ takes 4 ms to compute with the approximation, 76 ms without. The renderer learns what one iteration costs on your GPU and sizes every frame to fit the screen refresh; while the view rests, it tries a little more work each frame to sharpen sooner.
 
+**The atlas.** The lens draws the Julia set of c on a second, small WebGL canvas. The period of a point inside the set is that of the cycle its orbit settles on; outside, that of the step where its orbit came nearest to 0. Newton's method on z_p(c) = 0 then finds the nucleus of the component, and a classic estimate its size. External rays are traced inwards by Newton's method on z_n(c) = R^(2^(n−1−m)) e^(2πi 2^(n−1) θ), level after level, in a worker; rays that land at a parabolic root approach it slowly, so each one is followed for 300 doublings. Lavaurs' algorithm pairs the angles k / (2^p − 1) of each period without crossing the chords already drawn, and finds exactly the 1, 3, 6, 15 and 27 components of periods 2 to 6.
+
 **Depth.** The limit is a magnification of about 10³⁰⁰, where the size of a pixel stops being an ordinary double. One case is still slow: deep inside a minibrot of small period, every pixel runs all its iterations, and no approximation holds across the returns of its orbit to zero, so the image sharpens in seconds rather than at once.
 
 ```
@@ -129,6 +140,8 @@ src/math/mandelbrot.ts   iteration, reference orbits in doubles and in fixed poi
 src/math/deep.ts         the shader's perturbation in 32-bit floats, with offsets that carry an exponent
 src/math/bla.ts          the table of bilinear approximations
 src/math/view.ts         view, zoom around a point, flights
+src/math/atlas.ts        orbits, periods, nuclei, sizes, external rays, Lavaurs' diagram, π (tested)
+src/atlas/               the lens, the drawings over the image, Lavaurs' diagram, the atlas worker
 src/render/shaders.ts    the same iteration in GLSL, colouring, display
 src/render/reference.ts  which reference to draw with, and when to ask for a new one
 src/render/orbit-worker.ts  deep orbits and their tables, off the page
@@ -153,7 +166,7 @@ The site runs locally. `.github/workflows/ci.yml` runs the tests and the build o
 
 - [x] **Phase 1.** Real-time explorer: smooth navigation, perturbation to 10¹², palettes, places, shared links, image export.
 - [x] **Phase 2.** Deep zoom to 10³⁰⁰: arbitrary-precision reference in a worker, offsets that carry their own exponent, bilinear approximation, the 2023 dive to 10¹⁸.
-- [ ] **Phase 3.** Atlas: periods of the bulbs, live orbits, Julia sets under the pointer, external rays, π in seahorse valley.
+- [x] **Phase 3.** Atlas: Julia sets and orbits under the pointer, periods and sizes of components, external rays, Lavaurs' diagram, π in seahorse valley.
 - [ ] **Phase 4.** Odyssey: an interactive story in eight chapters, driven by the live explorer.
 - [ ] **Phase 5.** Senses: orbits as sound, an endless automatic dive, video export.
 - [ ] **Phase 6.** Buddhabrot, 3D relief, other fractals.
@@ -162,4 +175,5 @@ The site runs locally. `.github/workflows/ci.yml` runs the tests and the build o
 
 - The Turbo colormap is by Google (Apache-2.0), read from OpenCV's `COLORMAP_TURBO`.
 - Perturbation for deep zoom was introduced by K. I. Martin. Rebasing and the bilinear approximation were introduced by Zhuoran on Fractal Forums. The continuous count follows Inigo Quilez's article on smooth iteration.
+- π in seahorse valley was found by Dave Boll in 1991. Lavaurs' diagram and its algorithm are due to Pierre Lavaurs (1986). Tracing external rays by Newton's method follows Tomoki Kawahira's algorithm.
 - The original 2023 script, kept in [`legacy/`](legacy/), rendered this zoom one image at a time with 80-bit arithmetic.
