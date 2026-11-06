@@ -101,7 +101,6 @@ float iterate() {
     if (wa > 0.0) { int k = expo(wa); w *= p2(-k); e += k; }
     m = 1;
     i = 1;
-    bool plain = false;
     vec2 lastW = vec2(1e30);
     int lastE = 0;
     for (; i < uMaxIter; i++) {
@@ -132,21 +131,47 @@ float iterate() {
       }
       wa = maxAbs(w);
       if (wa > 0.0) { int k = expo(wa); w *= p2(-k); e += k; }
-      if (uPeriodic == 1 && m >= uOrbitLen && e <= LEAVE) {
-        // The end of the period: the reference is back at 0, so z = dz. Start over from 0,
-        // unless this offset is the one of the last return.
-        if (e == lastE && maxAbs(w - lastW) <= SAME * maxAbs(w)) return -1.0;
-        lastW = w;
-        lastE = e;
+      vec2 Zm = orbitAt(m);
+      if (e > LEAVE) {
+        // The offset fits a float: z = Z + dz, checked as the plain loop does. The offset
+        // keeps its exponent all the same, so that dc is never lost, even at the returns
+        // of a periodic reference where the step is dz^2 + dc.
+        vec2 d = w * p2(e);
+        vec2 z = Zm + d;
+        float r2 = dot(z, z);
+        if (r2 > BAILOUT2) return smoothCount(i, r2);
+        if (r2 <= dot(d, d) || m >= uOrbitLen) {
+          w = z;
+          e = 0;
+          wa = maxAbs(w);
+          if (wa > 0.0) { int k = expo(wa); w *= p2(-k); e += k; }
+          if (uPeriodic == 1 && m >= uOrbitLen) {
+            if (e == lastE && maxAbs(w - lastW) <= SAME * maxAbs(w)) return -1.0;
+            lastW = w;
+            lastE = e;
+          }
+          m = 0;
+        }
+        continue;
+      }
+      // Below a float, z = Z + dz cannot escape before the reference does.
+      if (m >= uOrbitLen) {
+        if (uPeriodic == 0) {
+          // The reference escaped: z is its last point, to the precision of a float.
+          w = Zm;
+          e = 0;
+          wa = maxAbs(w);
+          if (wa > 0.0) { int k = expo(wa); w *= p2(-k); e += k; }
+        } else {
+          // The end of the period: the reference is back at 0, so z = dz. Start over from 0,
+          // unless this offset is the one of the last return.
+          if (e == lastE && maxAbs(w - lastW) <= SAME * maxAbs(w)) return -1.0;
+          lastW = w;
+          lastE = e;
+        }
         m = 0;
         continue;
       }
-      if (e > LEAVE || m >= uOrbitLen) {
-        dz = w * p2(e);
-        plain = true;
-        break;
-      }
-      vec2 Zm = orbitAt(m);
       float zma = maxAbs(Zm);
       if (zma == 0.0) {
         // Z is 0, so z = dz: rebasing changes nothing but brings the skips back in step.
@@ -164,17 +189,7 @@ float iterate() {
         }
       }
     }
-    if (!plain) return -1.0;
-    dc = dcm * p2(ec);
-    // Finish the step the deep loop left at, as the plain loop would.
-    vec2 z = orbitAt(m) + dz;
-    float r2 = dot(z, z);
-    if (r2 > BAILOUT2) return smoothCount(i, r2);
-    if (r2 <= dot(dz, dz) || m >= uOrbitLen) {
-      dz = z;
-      m = 0;
-    }
-    i++;
+    return -1.0;
   } else {
     dc = dcPx * uPixel;
   }

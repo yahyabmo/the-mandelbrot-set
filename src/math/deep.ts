@@ -7,8 +7,9 @@
  * whose smallest normal value is 2^-126. It is then kept as w * 2^e: a float mantissa
  * and an integer exponent, renormalised at every step. The three terms of the step,
  * 2 Z dz, dz^2 and dc, are brought to the exponent of the largest before they are added,
- * so that none is lost to underflow while it still matters, even where Z is 0. Once dz
- * has grown past 2^-100 it is a plain float again and the usual loop takes over.
+ * so that none is lost to underflow while it still matters, even where Z is 0. The pixel
+ * stays in this form to the end; once dz is large enough, z = Z + dz is checked in plain
+ * floats for escape and rebasing.
  *
  * In both loops, a bilinear approximation (see bla.ts) skips 2^l steps at once wherever
  * one holds.
@@ -149,7 +150,6 @@ export function iterateGpu(
     normalise();
     m = 1;
     i = 1;
-    let plain = false;
     // The offset at the last return of the period, for the interior check.
     let lastX = NaN;
     let lastY = NaN;
@@ -195,24 +195,52 @@ export function iterateGpu(
         normalise();
         m++;
       }
-      if (periodic && m >= len && e <= LEAVE) {
-        // The end of the period: the reference is back at 0, so z = dz. Start over from 0,
-        // unless this offset is the one of the last return.
-        if (e === lastE && maxAbs(f(wx - lastX), f(wy - lastY)) <= SAME * maxAbs(wx, wy)) return done(-1);
-        lastX = wx;
-        lastY = wy;
-        lastE = e;
+      const Zx = orbit[2 * m];
+      const Zy = orbit[2 * m + 1];
+      if (e > LEAVE) {
+        // The offset fits a float: z = Z + dz, checked as the plain loop does. The offset
+        // keeps its exponent all the same, so that dc is never lost, even at the returns
+        // of a periodic reference where the step is dz^2 + dc.
+        const ddx = f(wx * p2(e));
+        const ddy = f(wy * p2(e));
+        const x = f(Zx + ddx);
+        const y = f(Zy + ddy);
+        const r2 = f(f(x * x) + f(y * y));
+        if (r2 > BAILOUT2) return done(smooth(i, r2));
+        if (r2 <= f(f(ddx * ddx) + f(ddy * ddy)) || m >= len) {
+          wx = x;
+          wy = y;
+          e = 0;
+          normalise();
+          if (periodic && m >= len) {
+            if (e === lastE && maxAbs(f(wx - lastX), f(wy - lastY)) <= SAME * maxAbs(wx, wy)) return done(-1);
+            lastX = wx;
+            lastY = wy;
+            lastE = e;
+          }
+          m = 0;
+        }
+        continue;
+      }
+      // Below a float, z = Z + dz cannot escape before the reference does.
+      if (m >= len) {
+        if (!periodic) {
+          // The reference escaped: z is its last point, to the precision of a float.
+          wx = Zx;
+          wy = Zy;
+          e = 0;
+          normalise();
+        } else {
+          // The end of the period: the reference is back at 0, so z = dz. Start over from 0,
+          // unless this offset is the one of the last return.
+          if (e === lastE && maxAbs(f(wx - lastX), f(wy - lastY)) <= SAME * maxAbs(wx, wy)) return done(-1);
+          lastX = wx;
+          lastY = wy;
+          lastE = e;
+        }
         m = 0;
         continue;
       }
-      if (e > LEAVE || m >= len) {
-        dx = f(wx * p2(e));
-        dy = f(wy * p2(e));
-        plain = true;
-        break;
-      }
-      const Zx = orbit[2 * m];
-      const Zy = orbit[2 * m + 1];
       const Za = maxAbs(Zx, Zy);
       if (Za === 0) {
         // Z is 0, so z = dz: rebasing changes nothing but brings the skips back in step.
@@ -231,24 +259,10 @@ export function iterateGpu(
         }
       }
     }
-    if (!plain) return done(-1);
-    cx = f(dcx * p2(ec));
-    cy = f(dcy * p2(ec));
-    // Finish the step the deep loop left at, as the plain loop would.
-    const x = f(orbit[2 * m] + dx);
-    const y = f(orbit[2 * m + 1] + dy);
-    const r2 = f(f(x * x) + f(y * y));
-    if (r2 > BAILOUT2) return done(smooth(i, r2));
-    if (r2 <= f(f(dx * dx) + f(dy * dy)) || m >= len) {
-      dx = x;
-      dy = y;
-      m = 0;
-    }
-    i++;
-  } else {
-    cx = f(f(dpx) * f(pixel));
-    cy = f(f(dpy) * f(pixel));
+    return done(-1);
   }
+  cx = f(f(dpx) * f(pixel));
+  cy = f(f(dpy) * f(pixel));
 
   // dz <- 2 Z dz + dz^2 + dc, z = Z + dz, with rebasing.
   let qx = NaN;

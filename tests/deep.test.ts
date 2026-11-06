@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildBla } from "../src/math/bla";
+import { frameWidth, nextMinibrot, random as seeded, startMinibrot, type Minibrot } from "../src/dive/plan";
 import { expo, f, iterateGpu, offsetOf, p2, splitPixel } from "../src/math/deep";
 import { FRAC, fromDecimal, fromNumber, type Fixed } from "../src/math/fixed";
 import { bitsFor, iteratePerturbed, preciseOrbit } from "../src/math/mandelbrot";
@@ -138,6 +139,26 @@ describe("the shader's perturbation", () => {
     expect(r.bla).toBe(1);
     expect(r.blaSteps / 16).toBeLessThan(60);
   });
+
+  it("draws a deep copy from its nucleus: the outside escapes on time, the inside stops early", () => {
+    // A copy of period 370, 10^-47 wide, from the endless dive: offsets below a float, and
+    // returns where the step is dz^2 + dc with dc far under the range of a float.
+    const rng = seeded(3);
+    let m: Minibrot = startMinibrot(0)!;
+    for (let step = 0; step < 4; step++) m = nextMinibrot(m, rng)!;
+    const pixel = frameWidth(m) / W;
+    const maxIter = 300 * m.period + 5000;
+    const orbit = preciseOrbit(m.cx, m.cy, bitsFor(pixel) + 16, maxIter);
+    expect(orbit.length).toBe(m.period);
+    const z32 = Float32Array.from(orbit.data);
+    const bla = buildBla(orbit, Math.hypot(W, W * 0.6) * pixel);
+    for (const [px, py] of [[700, 0], [-650, -400], [330, 110], [60, 10]]) {
+      const exact = iterateExactAt(m.cx + fromNumber(offsetOf(px, pixel)), m.cy + fromNumber(offsetOf(py, pixel)), maxIter, Math.min(FRAC, bitsFor(pixel) + 24));
+      const r = iterateGpu(z32, orbit.length, px, py, pixel, maxIter, bla, true);
+      expect(close(r.value, exact)).toBe(true);
+      expect(r.steps).toBeLessThan(1000);
+    }
+  }, 120_000);
 
   it("does not take the outside of a minibrot for its inside", () => {
     // A view of the whole copy of period 13 and around it, from its nucleus.
