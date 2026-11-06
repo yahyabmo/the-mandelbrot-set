@@ -41,8 +41,16 @@ export interface Orbit {
   length: number;
 }
 
+/** Room for an orbit that may stop long before its limit: grown as it goes. */
+function grow(data: Float64Array, n: number, maxIter: number): Float64Array {
+  if (2 * n + 1 < data.length) return data;
+  const next = new Float64Array(2 * (Math.min(maxIter, 2 * n + 1024) + 1));
+  next.set(data);
+  return next;
+}
+
 export function referenceOrbit(cre: number, cim: number, maxIter: number): Orbit {
-  const data = new Float64Array(2 * (maxIter + 1));
+  let data = new Float64Array(2 * (Math.min(maxIter, 65536) + 1));
   let x = 0;
   let y = 0;
   let n = 0;
@@ -51,6 +59,7 @@ export function referenceOrbit(cre: number, cim: number, maxIter: number): Orbit
     y = 2 * x * y + cim;
     x = nx;
     n++;
+    data = grow(data, n, maxIter);
     data[2 * n] = x;
     data[2 * n + 1] = y;
     if (x * x + y * y > REFERENCE_ESCAPE2) break;
@@ -76,11 +85,28 @@ export function preciseOrbit(cx: Fixed, cy: Fixed, bits: number, maxIter: number
   // |Z| stays below 2^3 here, so Number() never overflows below 1020 bits.
   const drop = BigInt(Math.max(0, bits - 1020));
   const unit = 2 ** -Math.min(bits, 1020);
-  const data = new Float64Array(2 * (maxIter + 1));
+  let data = new Float64Array(2 * (Math.min(maxIter, 65536) + 1));
   let x = 0n;
   let y = 0n;
   let n = 0;
+  // dZ/dc, as a mantissa and a power of two: it says how far rounding c moves Z.
+  let dr = 0;
+  let di = 0;
+  let de = 0;
   while (n < maxIter) {
+    // dZ <- 2 Z dZ + 1, from the Z of the step before.
+    const zx0 = n > 0 ? data[2 * n] : 0;
+    const zy0 = n > 0 ? data[2 * n + 1] : 0;
+    const ndr = 2 * (zx0 * dr - zy0 * di) + (de < 1000 ? 2 ** -de : 0);
+    di = 2 * (zx0 * di + zy0 * dr);
+    dr = ndr;
+    const a = Math.max(Math.abs(dr), Math.abs(di));
+    if (a > 2 ** 64 || (a < 2 ** -64 && a > 0)) {
+      const k = Math.floor(Math.log2(a));
+      dr *= 2 ** -k;
+      di *= 2 ** -k;
+      de += k;
+    }
     const xx = (x * x) >> B;
     const yy = (y * y) >> B;
     y = ((x * y) >> B1) + ci;
@@ -88,12 +114,21 @@ export function preciseOrbit(cx: Fixed, cy: Fixed, bits: number, maxIter: number
     n++;
     const zx = Number(x >> drop) * unit;
     const zy = Number(y >> drop) * unit;
+    data = grow(data, n, maxIter);
     data[2 * n] = zx;
     data[2 * n + 1] = zy;
     if (zx * zx + zy * zy > REFERENCE_ESCAPE2) break;
+    // Back to 0, to within what rounding c to `bits` bits moves Z: c is a nucleus, and the
+    // orbit repeats from here. One period is enough, since the pixels rebase onto its start
+    // whenever they reach its end.
+    const z = Math.hypot(zx, zy);
+    if (z === 0 || Math.log2(z) + bits < RETURN_BITS + de + Math.log2(Math.hypot(dr, di) || 1)) break;
   }
   return { data: data.subarray(0, 2 * (n + 1)), length: n };
 }
+
+/** Z counts as back at 0 when it is within 2^RETURN_BITS roundings of c. */
+const RETURN_BITS = 20;
 
 /**
  * Iterate c0 + dc through its offset from the reference orbit:

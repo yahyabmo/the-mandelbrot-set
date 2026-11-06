@@ -29,6 +29,7 @@ uniform float uPixelM;    // pixel size = uPixelM * 2^uPixelE
 uniform int uPixelE;
 uniform sampler2D uOrbit; // reference orbit Z_0..Z_n as RG32F, 4096 per row
 uniform int uOrbitLen;
+uniform int uPeriodic;          // 1 when the reference is a nucleus: its orbit ends back at 0
 uniform int uBla;               // 1 when the approximations hold for every pixel of the view
 uniform sampler2D uBlaAB;       // mantissas of A and B, 4096 entries per row
 uniform sampler2D uBlaER;       // exponents of A and B, then log2 of the radius
@@ -40,6 +41,7 @@ const float BAILOUT2 = 65536.0;
 const int LEAVE = -100;          // an offset above 2^LEAVE fits a plain float again
 const float SMALL_Z = 8.6736174e-19; // 2^-60
 const int NONE = -100000;
+const float SAME = 9.5367432e-7; // 2^-20: two returns this close mark a pixel inside
 
 vec2 cmul(vec2 a, vec2 b) { return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x); }
 vec2 orbitAt(int k) { return texelFetch(uOrbit, ivec2(k & 4095, k >> 12), 0).xy; }
@@ -100,6 +102,8 @@ float iterate() {
     m = 1;
     i = 1;
     bool plain = false;
+    vec2 lastW = vec2(1e30);
+    int lastE = 0;
     for (; i < uMaxIter; i++) {
       int l = blaLevel(m, float(e) + logOf(maxAbs(w)));
       if (l > 0) {
@@ -128,6 +132,15 @@ float iterate() {
       }
       wa = maxAbs(w);
       if (wa > 0.0) { int k = expo(wa); w *= p2(-k); e += k; }
+      if (uPeriodic == 1 && m >= uOrbitLen && e <= LEAVE) {
+        // The end of the period: the reference is back at 0, so z = dz. Start over from 0,
+        // unless this offset is the one of the last return.
+        if (e == lastE && maxAbs(w - lastW) <= SAME * maxAbs(w)) return -1.0;
+        lastW = w;
+        lastE = e;
+        m = 0;
+        continue;
+      }
       if (e > LEAVE || m >= uOrbitLen) {
         dz = w * p2(e);
         plain = true;
@@ -167,6 +180,7 @@ float iterate() {
   }
 
   // dz <- 2 Z dz + dz^2 + dc, z = Z + dz, rebasing to the start of the orbit when needed.
+  vec2 lastZ = vec2(1e30);
   for (; i < uMaxIter; i++) {
     int l = blaLevel(m, logOf(maxAbs(dz)));
     if (l > 0) {
@@ -184,6 +198,10 @@ float iterate() {
     vec2 z = orbitAt(m) + dz;
     float r2 = dot(z, z);
     if (r2 > BAILOUT2) return smoothCount(i, r2);
+    if (uPeriodic == 1 && m >= uOrbitLen) {
+      if (maxAbs(z - lastZ) <= SAME * maxAbs(z)) return -1.0;
+      lastZ = z;
+    }
     if (r2 <= dot(dz, dz) || m >= uOrbitLen) {
       dz = z;
       m = 0;

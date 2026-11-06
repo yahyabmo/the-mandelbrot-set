@@ -43,6 +43,9 @@ function agreement(cx: Fixed, cy: Fixed, width: number, maxIter: number, n = 48)
   const dcMax = Math.hypot(W, W * 0.6) * 0.5 * pixel;
   const bla = buildBla(orbit, dcMax);
   const exactBits = Math.min(FRAC, bitsFor(pixel) + 24);
+  // A reference at a nucleus is one period long and ends back at 0.
+  const L = orbit.length;
+  const periodic = L < maxIter && Math.hypot(orbit.data[2 * L], orbit.data[2 * L + 1]) < 2 ** -40;
   const next = random(5);
   let gpu = 0;
   let withBla = 0;
@@ -58,8 +61,8 @@ function agreement(cx: Fixed, cy: Fixed, width: number, maxIter: number, n = 48)
     const dx = offsetOf(dpx, pixel);
     const dy = offsetOf(dpy, pixel);
     const exact = iterateExactAt(cx + fromNumber(dx), cy + fromNumber(dy), maxIter, exactBits);
-    const plain = iterateGpu(z32, orbit.length, dpx, dpy, pixel, maxIter);
-    const skipping = iterateGpu(z32, orbit.length, dpx, dpy, pixel, maxIter, bla);
+    const plain = iterateGpu(z32, orbit.length, dpx, dpy, pixel, maxIter, null, periodic);
+    const skipping = iterateGpu(z32, orbit.length, dpx, dpy, pixel, maxIter, bla, periodic);
     values.push(plain.value);
     if (close(plain.value, exact)) gpu++;
     if (close(skipping.value, exact)) withBla++;
@@ -68,7 +71,7 @@ function agreement(cx: Fixed, cy: Fixed, width: number, maxIter: number, n = 48)
     blaSteps += skipping.steps;
     iterations += exact < 0 ? maxIter : Math.ceil(exact);
   }
-  return { gpu: gpu / n, bla: withBla / n, double: double / n, values, saved: 1 - blaSteps / steps, iterations };
+  return { gpu: gpu / n, bla: withBla / n, double: double / n, values, saved: 1 - blaSteps / steps, iterations, steps, blaSteps, periodic };
 }
 
 describe("float32 helpers of the shader", () => {
@@ -125,14 +128,27 @@ describe("the shader's perturbation", () => {
     expect(r.bla).toBe(1);
   });
 
-  it("skips most steps of each period inside a minibrot of period 13", () => {
-    // No approximation holds across the return to 0: each period takes a step from 0,
-    // then skips of 8 and 4, so 10 steps in 13 are saved.
+  it("stops the pixels inside a minibrot once their returns agree", () => {
+    // The orbit of the nucleus is one period long; inside, two returns to the same offset
+    // end the pixel long before the limit of 3000 iterations.
     const c = realNucleus(-1.99, 13, 400);
     const r = agreement(c, 0n, 1e-50, 3000, 16);
+    expect(r.periodic).toBe(true);
     expect(r.values.every((v) => v === -1)).toBe(true);
     expect(r.bla).toBe(1);
-    expect(r.saved).toBeGreaterThan(0.75);
+    expect(r.blaSteps / 16).toBeLessThan(60);
+  });
+
+  it("does not take the outside of a minibrot for its inside", () => {
+    // A view of the whole copy of period 13 and around it, from its nucleus.
+    const c = realNucleus(-1.99, 13, 400);
+    // The copy is 6.1e-10 across.
+    const r = agreement(c, 0n, 3.2 * 6.1e-10, 20000, 48);
+    expect(r.periodic).toBe(true);
+    expect(r.values.some((v) => v > 0)).toBe(true);
+    expect(r.values.some((v) => v < 0)).toBe(true);
+    expect(r.gpu).toBeGreaterThan(0.95);
+    expect(r.bla).toBeGreaterThan(0.95);
   });
 
   it("skips most of the steps of a deep dendrite", () => {

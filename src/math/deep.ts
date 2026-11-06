@@ -12,6 +12,10 @@
  *
  * In both loops, a bilinear approximation (see bla.ts) skips 2^l steps at once wherever
  * one holds.
+ *
+ * When the reference is a nucleus, its orbit is one period long and comes back to 0 at its
+ * end. A pixel inside that minibrot then comes back to the same offset at every period:
+ * two returns that agree to 2^-20 mark it as inside, and it stops there.
  */
 import type { BlaTable } from "./bla";
 import { BAILOUT, smooth } from "./mandelbrot";
@@ -25,6 +29,8 @@ const SMALL_Z = 2 ** -60;
 const NONE = -100000;
 const BAILOUT2 = BAILOUT * BAILOUT;
 const NORMAL = 2 ** -126;
+/** Two returns closer than this, relative to the offset, mark a pixel inside the minibrot. */
+const SAME = 2 ** -20;
 
 /** Rounding to float32, flushing what falls below the normal range. */
 export function f(x: number): number {
@@ -110,6 +116,7 @@ export function iterateGpu(
   pixel: number,
   maxIter: number,
   bla: BlaTable | null = null,
+  periodic = false,
 ): Counts {
   let steps = 0;
   const done = (value: number) => ({ value, steps });
@@ -143,6 +150,10 @@ export function iterateGpu(
     m = 1;
     i = 1;
     let plain = false;
+    // The offset at the last return of the period, for the interior check.
+    let lastX = NaN;
+    let lastY = NaN;
+    let lastE = 0;
     for (; i < maxIter; i++) {
       steps++;
       const l = blaLevel(bla, len, m, e + logOf(maxAbs(wx, wy)));
@@ -183,6 +194,16 @@ export function iterateGpu(
         e = E;
         normalise();
         m++;
+      }
+      if (periodic && m >= len && e <= LEAVE) {
+        // The end of the period: the reference is back at 0, so z = dz. Start over from 0,
+        // unless this offset is the one of the last return.
+        if (e === lastE && maxAbs(f(wx - lastX), f(wy - lastY)) <= SAME * maxAbs(wx, wy)) return done(-1);
+        lastX = wx;
+        lastY = wy;
+        lastE = e;
+        m = 0;
+        continue;
       }
       if (e > LEAVE || m >= len) {
         dx = f(wx * p2(e));
@@ -230,6 +251,8 @@ export function iterateGpu(
   }
 
   // dz <- 2 Z dz + dz^2 + dc, z = Z + dz, with rebasing.
+  let qx = NaN;
+  let qy = NaN;
   for (; i < maxIter; i++) {
     steps++;
     const l = blaLevel(bla, len, m, logOf(maxAbs(dx, dy)));
@@ -257,6 +280,11 @@ export function iterateGpu(
     const y = f(orbit[2 * m + 1] + dy);
     const r2 = f(f(x * x) + f(y * y));
     if (r2 > BAILOUT2) return done(smooth(i, r2));
+    if (periodic && m >= len) {
+      if (maxAbs(f(x - qx), f(y - qy)) <= SAME * maxAbs(x, y)) return done(-1);
+      qx = x;
+      qy = y;
+    }
     if (r2 <= f(f(dx * dx) + f(dy * dy)) || m >= len) {
       dx = x;
       dy = y;
