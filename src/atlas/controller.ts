@@ -28,7 +28,17 @@ const READ_ITER = 4000;
 const MAX_PERIOD = 6;
 const PI_DIGITS = "3.14159265358979";
 
-type Layer = "lens" | "component" | "orbit" | "rays" | "pi";
+export type Layer = "lens" | "component" | "orbit" | "rays" | "pi";
+
+/** What the atlas reads at the pointer, for whoever wants to react to it. */
+export interface AtlasSight {
+  /** True when the reading is aimed: by the mouse, or by the centre of the view on a touch screen. */
+  pointing: boolean;
+  c: Complex;
+  reading: Reading | null;
+  /** Chords picked in Lavaurs' diagram so far. */
+  picks: number;
+}
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -49,6 +59,9 @@ export class Atlas {
   private probe: Complex = [0, 0];
   private lit: Chord | null = null;
   private hovered: Chord | null = null;
+  private picks = 0;
+  /** On a screen without hover, the cross at the centre is the pointer. */
+  private touch = matchMedia("(hover: none)").matches;
 
   constructor(private host: AtlasHost) {
     this.lens = new Lens($<HTMLCanvasElement>("lens-julia"), $<HTMLCanvasElement>("lens-orbit"));
@@ -77,6 +90,16 @@ export class Atlas {
   toggle(layer: Layer): void {
     this.layers[layer] = !this.layers[layer];
     this.sync();
+  }
+
+  /** Switch layers on or off together, as a chapter of the story does. */
+  setLayers(on: Partial<Record<Layer, boolean>>): void {
+    Object.assign(this.layers, on);
+    this.sync();
+  }
+
+  sight(): AtlasSight {
+    return { pointing: this.pointer !== null || this.touch, c: this.probe, reading: this.reading, picks: this.picks };
   }
 
   private sync(): void {
@@ -199,6 +222,7 @@ export class Atlas {
   private flyToChord(c: Chord): void {
     const root = this.rootOf(c);
     if (!root) return;
+    this.picks++;
     const n = nucleus(root[0], root[1], c.period);
     if (!n) return;
     const s = Math.hypot(...componentSize(n, c.period));
