@@ -22,6 +22,11 @@
   box-sizing: border-box;
 }
 
+/* An element with the hidden attribute stays hidden, whatever its layout rule. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
