@@ -4,7 +4,9 @@ import { fromNumber, toNumber } from "../src/math/fixed";
 import {
   clampWidth,
   ease,
+  flightPath,
   HOME,
+  inSight,
   homeView,
   MIN_WIDTH,
   panBy,
@@ -86,6 +88,33 @@ describe("view", () => {
       expect(off).toBeLessThan(0.5);
     }
     expect(v).toBe(deep);
+  });
+
+  it("pulls back to bring a far target into view before diving to it", () => {
+    const spiral = viewOf("-0.743643887037151", "0.13182590420533", 4e-5);
+    const deep = viewOf("-1.78780638350855487198076170", "0.00005689075511288150404139", 3.1e-18);
+    let v: View = spiral;
+    let seen = false;
+    let widest = 0;
+    const route = flightPath(spiral, deep);
+    expect(route.length).toBe(2);
+    let target = route.shift()!;
+    for (let i = 0; i < 1000 && v !== deep; i++) {
+      if (route.length && inSight(v, route[0])) target = route.shift()!;
+      v = settled(v, target, W) ? target : ease(v, target, 0.18, 8 / 60);
+      const off = Math.hypot(toNumber(deep.cx - v.cx), toNumber(deep.cy - v.cy)) / v.width;
+      widest = Math.max(widest, v.width);
+      if (off < 0.5) seen = true;
+      // Once in sight, the target stays in sight.
+      else expect(seen).toBe(false);
+    }
+    expect(v).toBe(deep);
+    expect(widest).toBeGreaterThan(1);
+    expect(widest).toBeLessThan(4);
+  });
+
+  it("flies straight to a place already in sight", () => {
+    expect(flightPath(HOME, zoomAt(HOME, 300, 200, W, H, 4))).toHaveLength(1);
   });
 
   it("limits the speed of a long zoom", () => {

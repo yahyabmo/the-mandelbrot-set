@@ -97,3 +97,28 @@ export function settled(a: View, b: View, wPx: number): boolean {
     Math.abs(Math.log(a.width / b.width)) < 1e-4
   );
 }
+
+/** Distance from the centre of `v` to the centre of `to`, in widths of `v`. */
+function distanceInWidths(v: View, to: View): number {
+  return Math.hypot(toNumber(to.cx - v.cx), toNumber(to.cy - v.cy)) / v.width;
+}
+
+/** A view this many times wider than the distance shows both ends of a flight. */
+const OVERVIEW = 2.5;
+/** The dive starts once the target is this close to the centre, in view widths. */
+const IN_SIGHT = 0.3;
+
+/**
+ * Waypoints of a flight to a place: straight there when it is in sight, otherwise first
+ * back to an overview centred on it, so that the dive is made with the target in view.
+ */
+export function flightPath(from: View, to: View): View[] {
+  const d = distanceInWidths(from, to) * from.width;
+  if (d > 0.5 * from.width && to.width < OVERVIEW * d) return [{ cx: to.cx, cy: to.cy, width: OVERVIEW * d }, to];
+  return [to];
+}
+
+/** True once `to` is near enough to the centre of `v` to dive straight to it. */
+export function inSight(v: View, to: View): boolean {
+  return distanceInWidths(v, to) < IN_SIGHT;
+}

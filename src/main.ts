@@ -2,7 +2,7 @@ import "./style.css";
 import { paletteById, paletteCss, PALETTES, type Rgb } from "./color/palettes";
 import { autoIterations } from "./math/iterations";
 import { toDecimal, toNumber } from "./math/fixed";
-import { ease, HOME_WIDTH, homeView, MAX_ZOOM_RATE, MIN_WIDTH, panBy, settled, zoomAt, type View } from "./math/view";
+import { ease, flightPath, HOME_WIDTH, homeView, inSight, MAX_ZOOM_RATE, MIN_WIDTH, panBy, settled, zoomAt, type View } from "./math/view";
 import { PLACES, type Place } from "./places";
 import { Renderer } from "./render/renderer";
 import { coordinateText, magnificationText, scientificText, superscript } from "./ui/format";
@@ -230,8 +230,12 @@ function syncPanel(): void {
   smooth.setAttribute("aria-pressed", String(state.smooth));
 }
 
+/** Waypoints left on the way to a place, after the current target. */
+let route: View[] = [];
+
 function flyTo(v: View): void {
-  state.target = v;
+  route = flightPath(state.current, v);
+  state.target = route.shift()!;
 }
 
 function goTo(p: Place): void {
@@ -294,6 +298,7 @@ let inertia = { x: 0, y: 0 };
 let lastMoveTime = 0;
 
 function interacted(): void {
+  route = [];
   state.place = null;
   $("hint").classList.add("gone");
 }
@@ -466,6 +471,7 @@ function frame(now: number): void {
     const decay = Math.exp(-dt * 4);
     inertia = { x: inertia.x * decay, y: inertia.y * decay };
   }
+  if (route.length && inSight(state.current, route[0])) state.target = route.shift()!;
   if (state.current !== state.target) {
     state.current = settled(state.current, state.target, w) ? state.target : ease(state.current, state.target, 1 - Math.exp(-dt * 12), MAX_ZOOM_RATE * dt);
   }
