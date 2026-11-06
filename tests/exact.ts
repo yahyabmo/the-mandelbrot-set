@@ -1,3 +1,4 @@
+import { toBits, type Fixed } from "../src/math/fixed";
 import { BAILOUT, smooth } from "../src/math/mandelbrot";
 
 /** Fixed-point iteration with BigInt: the ground truth the double-precision methods are judged by. */
@@ -18,8 +19,15 @@ export function toFixed(x: number): bigint {
 }
 
 export function iterateExact(cre: number, cim: number, maxIter: number): number {
-  const cr = toFixed(cre);
-  const ci = toFixed(cim);
+  return iterateExactBits(toFixed(cre), toFixed(cim), maxIter);
+}
+
+/** The same for a point given in the fixed point of the app, beyond double precision. */
+export function iterateExactAt(cre: Fixed, cim: Fixed, maxIter: number): number {
+  return iterateExactBits(toBits(cre, Number(BITS)), toBits(cim, Number(BITS)), maxIter);
+}
+
+function iterateExactBits(cr: bigint, ci: bigint, maxIter: number): number {
   const escape = BigInt(BAILOUT * BAILOUT) * ONE;
   let x = 0n;
   let y = 0n;

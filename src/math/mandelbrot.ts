@@ -1,3 +1,5 @@
+import { toBits, type Fixed } from "./fixed";
+
 /**
  * The iteration z -> z^2 + c, on the CPU in double precision.
  *
@@ -52,6 +54,43 @@ export function referenceOrbit(cre: number, cim: number, maxIter: number): Orbit
     data[2 * n] = x;
     data[2 * n + 1] = y;
     if (x * x + y * y > REFERENCE_ESCAPE2) break;
+  }
+  return { data: data.subarray(0, 2 * (n + 1)), length: n };
+}
+
+/** Bits after the point that a reference needs for pixels of this size, with a wide margin. */
+export function bitsFor(pixel: number): number {
+  return Math.max(64, Math.ceil(-Math.log2(pixel)) + 40);
+}
+
+/**
+ * The reference orbit of a centre given beyond double precision: Z is computed in fixed
+ * point with `bits` bits after the point, then each Z is rounded to a double, since the
+ * perturbation only needs it to float precision. Same layout as referenceOrbit.
+ */
+export function preciseOrbit(cx: Fixed, cy: Fixed, bits: number, maxIter: number): Orbit {
+  const B = BigInt(bits);
+  const B1 = BigInt(bits - 1);
+  const cr = toBits(cx, bits);
+  const ci = toBits(cy, bits);
+  // |Z| stays below 2^3 here, so Number() never overflows below 1020 bits.
+  const drop = BigInt(Math.max(0, bits - 1020));
+  const unit = 2 ** -Math.min(bits, 1020);
+  const data = new Float64Array(2 * (maxIter + 1));
+  let x = 0n;
+  let y = 0n;
+  let n = 0;
+  while (n < maxIter) {
+    const xx = (x * x) >> B;
+    const yy = (y * y) >> B;
+    y = ((x * y) >> B1) + ci;
+    x = xx - yy + cr;
+    n++;
+    const zx = Number(x >> drop) * unit;
+    const zy = Number(y >> drop) * unit;
+    data[2 * n] = zx;
+    data[2 * n + 1] = zy;
+    if (zx * zx + zy * zy > REFERENCE_ESCAPE2) break;
   }
   return { data: data.subarray(0, 2 * (n + 1)), length: n };
 }

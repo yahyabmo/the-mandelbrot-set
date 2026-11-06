@@ -1,7 +1,7 @@
 import { paletteTexels, type Palette, type Rgb } from "../color/palettes";
-import { fromNumber, toNumber, type Fixed } from "../math/fixed";
-import { referenceOrbit } from "../math/mandelbrot";
+import { toNumber, type Fixed } from "../math/fixed";
 import type { View } from "../math/view";
+import { References, type Reference } from "./reference";
 import { COLOURIZE, COUNT, DISPLAY, SAMPLE, VERTEX } from "./shaders";
 
 /** Above this width the direct float32 path is exact enough; below it, perturbation. */
@@ -16,6 +16,9 @@ const BOUND_FACTOR = 1.35;
 export interface Frame {
   view: View;
   maxIter: number;
+  /** Where the motion is heading, so that a deep reference can be prepared before arrival. */
+  target: View;
+  targetIter: number;
   palette: Palette;
   period: number;
   offset: number;
@@ -31,6 +34,8 @@ export interface Status {
   sharp: boolean;
   samples: number;
   scale: number;
+  /** The reference in use: none, an orbit in doubles, or the bits of a fixed-point one. */
+  reference: "none" | "doubles" | "waiting" | number;
 }
 
 interface Target {
@@ -66,9 +71,11 @@ export class Renderer {
   private paletteId = "";
   private orbit: WebGLTexture;
   private orbitLen = 0;
-  private orbitKey = "";
+  private refs = new References();
+  private uploaded: Reference | null = null;
   private refCx: Fixed = 0n;
   private refCy: Fixed = 0n;
+  private shown: { counts: Target; samples: number } | null = null;
   private low: Target | null = null;
   private full: Target | null = null;
   private accum: Target | null = null;
@@ -148,7 +155,20 @@ export class Renderer {
     const gl = this.gl;
     const perturb = f.view.width < DIRECT_LIMIT;
     this.uploadPalette(f.palette);
-    if (perturb) this.uploadOrbit(f.view, f.maxIter);
+    let reference: Status["reference"] = "none";
+    if (perturb || f.target.width < DIRECT_LIMIT) {
+      const ref = this.refs.get(f.view, f.maxIter, f.target, f.targetIter, this.width);
+      if (perturb && !ref) {
+        // No orbit precise enough yet: keep the last image up until it comes.
+        if (this.shown) this.display(f, this.shown.counts, this.shown.samples);
+        this.lastWork = 0;
+        return { engine: "perturbation", sharp: false, samples: 0, scale: this.motionScale, reference: "waiting" };
+      }
+      if (perturb && ref) {
+        this.uploadOrbit(ref);
+        reference = ref.bits === 0 ? "doubles" : ref.bits;
+      }
+    }
 
     const viewKey = [f.view.cx, f.view.cy, f.view.width, f.maxIter, this.width, this.height].join();
     const colourKey = [f.palette.id, f.period, f.offset, f.interior.join()].join();
@@ -190,13 +210,15 @@ export class Renderer {
 
     const sharp = this.fullRows >= this.height;
     const source = sharp ? this.full! : this.low!;
-    this.display(f, source, sharp && this.samples > 0 ? this.samples : 0);
+    this.shown = { counts: source, samples: sharp && this.samples > 0 ? this.samples : 0 };
+    this.display(f, source, this.shown.samples);
     gl.flush();
     return {
       engine: perturb ? "perturbation" : "direct",
       sharp,
       samples: sharp ? Math.max(1, this.samples) : 0,
       scale: sharp ? 1 : this.motionScale,
+      reference,
     };
   }
 
@@ -308,24 +330,20 @@ export class Renderer {
     this.paletteId = p.id;
   }
 
-  /** The reference orbit at the centre of the view, in double precision, stored as float32. */
-  private uploadOrbit(v: View, maxIter: number): void {
-    const key = `${v.cx},${v.cy},${maxIter}`;
-    if (key === this.orbitKey) return;
-    this.orbitKey = key;
-    const cre = toNumber(v.cx);
-    const cim = toNumber(v.cy);
-    const orbit = referenceOrbit(cre, cim, maxIter);
-    this.refCx = fromNumber(cre);
-    this.refCy = fromNumber(cim);
-    const points = orbit.length + 1;
+  /** The orbit of the reference, stored as float32: the perturbation needs no more. */
+  private uploadOrbit(ref: Reference): void {
+    if (ref === this.uploaded) return;
+    this.uploaded = ref;
+    const points = ref.orbit.length + 1;
     const rows = Math.ceil(points / ORBIT_ROW);
     const data = new Float32Array(rows * ORBIT_ROW * 2);
-    data.set(orbit.data);
+    data.set(ref.orbit.data.subarray(0, 2 * points));
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.orbit);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, ORBIT_ROW, rows, 0, gl.RG, gl.FLOAT, data);
-    this.orbitLen = orbit.length;
+    this.orbitLen = ref.orbit.length;
+    this.refCx = ref.cx;
+    this.refCy = ref.cy;
   }
 
   private texture(filter: number): WebGLTexture {

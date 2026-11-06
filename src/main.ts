@@ -142,11 +142,14 @@ document.addEventListener("pointerdown", (e) => {
 
 // The depth gauge: one tick per decade of magnification, down to the deepest this version reaches.
 const GAUGE_DECADES = Math.floor(Math.log10(HOME_WIDTH / MIN_WIDTH));
-for (let d = 0; d <= GAUGE_DECADES; d++) {
+const GAUGE_STEP = [1, 2, 5, 10, 20, 50].find((s) => GAUGE_DECADES / s <= 36) ?? 100;
+const GAUGE_LABEL = GAUGE_DECADES / GAUGE_STEP > 12 ? 5 : 3;
+for (let d = 0; d <= GAUGE_DECADES; d += GAUGE_STEP) {
+  const major = (d / GAUGE_STEP) % GAUGE_LABEL === 0;
   const tick = document.createElement("div");
-  tick.className = d % 3 === 0 ? "gauge-tick major" : "gauge-tick";
+  tick.className = major ? "gauge-tick major" : "gauge-tick";
   tick.style.top = `${(100 * d) / GAUGE_DECADES}%`;
-  if (d % 3 === 0) tick.innerHTML = `<span>10${superscript(d)}</span>`;
+  if (major) tick.innerHTML = `<span>10${superscript(d)}</span>`;
   $("gauge-track").append(tick);
 }
 
@@ -227,9 +230,13 @@ function syncPanel(): void {
   smooth.setAttribute("aria-pressed", String(state.smooth));
 }
 
+function flyTo(v: View): void {
+  state.target = v;
+}
+
 function goTo(p: Place): void {
   const [w, h] = size();
-  state.target = p.view === "home" ? homeView(w, h) : { ...p.view };
+  flyTo(p.view === "home" ? homeView(w, h) : { ...p.view });
   if (p.palette) state.palette = paletteById(p.palette);
   state.place = p.id;
   closePlaces(false);
@@ -267,7 +274,7 @@ function copyLink(): void {
 // A link pasted into the address bar of an open tab takes effect at once.
 window.addEventListener("hashchange", () => {
   const s = decode(location.hash, { view: state.target, palette: state.palette.id, density: state.density, offset: state.offset, detail: state.detail });
-  state.target = s.view;
+  flyTo(s.view);
   state.palette = paletteById(s.palette);
   state.density = s.density;
   state.offset = s.offset;
@@ -475,6 +482,8 @@ function frame(now: number): void {
   const status = renderer.render({
     view: state.current,
     maxIter,
+    target: state.target,
+    targetIter: autoIterations(state.target.width, state.detail),
     palette: state.palette,
     period: state.palette.period / state.density,
     offset: state.offset,
@@ -502,7 +511,17 @@ function frame(now: number): void {
     $("hud-im").textContent = coordinateText(v.cy, v.width);
     $("hud-iter").textContent = maxIter.toLocaleString("en-US");
     $("hud-engine").textContent = status.engine;
-    $("hud-image").textContent = status.sharp
+    $("hud-ref").textContent =
+      status.reference === "none"
+        ? "none"
+        : status.reference === "doubles"
+          ? "doubles"
+          : status.reference === "waiting"
+            ? "computing…"
+            : `${status.reference} bits`;
+    $("hud-image").textContent = status.reference === "waiting"
+      ? "waiting for the orbit"
+      : status.sharp
       ? status.samples > 1
         ? `sharp, ${status.samples} samples`
         : "sharp"

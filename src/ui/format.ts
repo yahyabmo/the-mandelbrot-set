@@ -17,7 +17,7 @@ export function magnificationText(m: number): string {
 }
 
 /** Decimals shown in the readout, past which the coordinate is cut short. */
-const SHOWN_DIGITS = 20;
+const SHOWN_DIGITS = 18;
 
 /** Enough digits to tell one pixel from the next; the link keeps them all. */
 export function coordinateText(x: Fixed, width: number): string {

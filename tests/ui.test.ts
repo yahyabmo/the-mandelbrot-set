@@ -7,7 +7,7 @@ import { fromDecimal, fromNumber, toNumber } from "../src/math/fixed";
 import { PALETTES } from "../src/color/palettes";
 
 const state: Shared = {
-  view: viewOf("-1.78780638350855487198076170", "0.00005689075511288150404139", 4e-9),
+  view: viewOf("-1.78780638350855487198076170", "0.00005689075511288150404139", 3.1e-18),
   palette: "turbo-2023",
   density: 1.5,
   offset: 0.25,
@@ -58,7 +58,7 @@ describe("formatting", () => {
   });
 
   it("cuts very long coordinates short in the readout", () => {
-    expect(coordinateText(state.view.cx, 1e-60)).toBe("-1.78780638350855487198…");
+    expect(coordinateText(state.view.cx, 1e-60)).toBe("-1.787806383508554872…");
   });
 });
 

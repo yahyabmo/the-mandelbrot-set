@@ -49,9 +49,9 @@ export const PLACES: Place[] = [
   {
     id: "dive-2023",
     name: "The 2023 dive",
-    blurb: "The point of the original script, 10⁹ deep",
-    // The centre of the 2023 script, to its 27 digits.
-    view: viewOf("-1.78780638350855487198076170", "0.00005689075511288150404139", 4e-9),
+    blurb: "Where the original script ended, 10¹⁸ deep",
+    // The centre of the 2023 script, to its 27 digits, and the width of its last frame.
+    view: viewOf("-1.78780638350855487198076170", "0.00005689075511288150404139", 3.1e-18),
     palette: "turbo-2023",
   },
 ];

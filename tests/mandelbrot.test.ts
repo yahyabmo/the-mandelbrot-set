@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { iterateDirect, iteratePerturbed, referenceOrbit, smooth } from "../src/math/mandelbrot";
-import { iterateExact } from "./exact";
+import { fromDecimal, fromNumber } from "../src/math/fixed";
+import { bitsFor, iterateDirect, iteratePerturbed, preciseOrbit, referenceOrbit, smooth } from "../src/math/mandelbrot";
+import { iterateExact, iterateExactAt } from "./exact";
 
 /** Small deterministic generator, so that a failure can be replayed. */
 function random(seed: number): () => number {
@@ -67,6 +68,36 @@ describe("perturbation with rebasing", () => {
       expect(perturbedRight).toBeGreaterThanOrEqual(directRight - 2);
     });
   }
+
+  const deep = [
+    { name: "the 2023 point at 10¹⁷", re: "-1.78780638350855487198076170", im: "0.00005689075511288150404139", width: 3e-17, maxIter: 3000 },
+    { name: "a seahorse at 10²⁸", re: "-0.7436438870371587047918217678", im: "0.1318259042053120314798063236", width: 1e-28, maxIter: 6000 },
+  ];
+  for (const { name, re, im, width, maxIter } of deep) {
+    it(`agrees with the exact value beyond double precision: ${name}`, () => {
+      const cx = fromDecimal(re);
+      const cy = fromDecimal(im);
+      const orbit = preciseOrbit(cx, cy, bitsFor(width / 2000), maxIter);
+      const next = random(11);
+      let right = 0;
+      const n = 60;
+      for (let k = 0; k < n; k++) {
+        const dx = (next() - 0.5) * width;
+        const dy = (next() - 0.5) * width * 0.6;
+        const exact = iterateExactAt(cx + fromNumber(dx), cy + fromNumber(dy), maxIter);
+        const v = iteratePerturbed(orbit, dx, dy, maxIter);
+        if ((v < 0 && exact < 0) || (v >= 0 && exact >= 0 && Math.abs(v - exact) < 0.05)) right++;
+      }
+      expect(right / n).toBeGreaterThan(0.95);
+    });
+  }
+
+  it("computes the same orbit in fixed point as in doubles where doubles suffice", () => {
+    const a = referenceOrbit(-0.743643887037151, 0.13182590420533, 200);
+    const b = preciseOrbit(fromNumber(-0.743643887037151), fromNumber(0.13182590420533), 120, 200);
+    expect(b.length).toBe(a.length);
+    for (let i = 0; i < 40; i++) expect(b.data[i]).toBeCloseTo(a.data[i], 12);
+  });
 
   it("records the reference until it escapes", () => {
     const orbit = referenceOrbit(0.5, 0.5, 1000);

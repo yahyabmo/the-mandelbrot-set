@@ -137,7 +137,7 @@ body.ui-hidden .reticle {
 .gauge {
   left: var(--gap);
   top: 112px;
-  bottom: 252px;
+  bottom: 266px;
   width: 56px;
   padding: 10px 0 12px;
   display: grid;
@@ -517,7 +517,7 @@ kbd {
 .readout {
   left: var(--gap);
   bottom: var(--gap);
-  width: 250px;
+  width: 272px;
   padding: 12px 22px 14px 16px;
 }
 .readout-label {

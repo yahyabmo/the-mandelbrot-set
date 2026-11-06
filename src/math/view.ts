@@ -15,8 +15,8 @@ export interface View {
 export const HOME_WIDTH = 3.6;
 export const HOME: View = { cx: fromNumber(-0.75), cy: 0n, width: HOME_WIDTH };
 
-/** Below this width the reference orbit, computed in double precision, runs out of digits. */
-export const MIN_WIDTH = 2e-12;
+/** Below this width the offsets from the reference fall under the range of a float32. */
+export const MIN_WIDTH = 1e-30;
 export const MAX_WIDTH = 12;
 
 /** A view written with decimals, as places and links give them. */
