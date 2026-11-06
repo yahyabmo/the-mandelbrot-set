@@ -1,7 +1,9 @@
 import { paletteTexels, type Palette, type Rgb } from "../color/palettes";
 import { toNumber, type Fixed } from "../math/fixed";
 import type { View } from "../math/view";
+import { BLA_ROW, type BlaTable } from "../math/bla";
 import { SCALED_BELOW, splitPixel } from "../math/deep";
+import type { Orbit } from "../math/mandelbrot";
 import { References, type Reference } from "./reference";
 import { COLOURIZE, COUNT, DISPLAY, SAMPLE, VERTEX } from "./shaders";
 
@@ -11,6 +13,8 @@ const ORBIT_ROW = 4096;
 const MAX_SAMPLES = 12;
 /** Share of a screen refresh given to the fractal, the rest is for the page and the compositor. */
 const BUDGET_SHARE = 0.7;
+/** Lowest resolution of the image in motion: blurred, but never a slide show. */
+const MIN_MOTION_SCALE = 0.08;
 /** A frame this much longer than a refresh was held back by the GPU, not by the screen. */
 const BOUND_FACTOR = 1.35;
 
@@ -37,6 +41,8 @@ export interface Status {
   scale: number;
   /** The reference in use: none, an orbit in doubles, or the bits of a fixed-point one. */
   reference: "none" | "doubles" | "waiting" | number;
+  /** True when bilinear approximations skip iterations. */
+  skipping: boolean;
 }
 
 interface Target {
@@ -73,7 +79,12 @@ export class Renderer {
   private orbit: WebGLTexture;
   private orbitLen = 0;
   private refs = new References();
-  private uploaded: Reference | null = null;
+  private uploaded: Orbit | null = null;
+  private blaAB: WebGLTexture;
+  private blaER: WebGLTexture;
+  private blaUploaded: BlaTable | null = null;
+  private bla: BlaTable | null = null;
+  private blaOffsets = new Int32Array(24);
   private refCx: Fixed = 0n;
   private refCy: Fixed = 0n;
   private shown: { counts: Target; samples: number } | null = null;
@@ -113,6 +124,22 @@ export class Renderer {
     };
     this.palette = this.texture(gl.LINEAR);
     this.orbit = this.texture(gl.NEAREST);
+    this.blaAB = this.texture(gl.NEAREST);
+    this.blaER = this.texture(gl.NEAREST);
+  }
+
+  /** Iteration counts of the sharp image at some pixels (x from the left, y from the bottom), for checks. */
+  readCounts(points: [number, number][]): number[] {
+    const gl = this.gl;
+    if (!this.full) return [];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.full.fbo);
+    const px = new Float32Array(4);
+    const out = points.map(([x, y]) => {
+      gl.readPixels(x, y, 1, 1, gl.RGBA, gl.FLOAT, px);
+      return px[0];
+    });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return out;
   }
 
   gpuName(): string {
@@ -149,24 +176,27 @@ export class Renderer {
   /** Rows of the full image that fit in the budget, for this engine and iteration limit. */
   private rowsInBudget(perturb: boolean, maxIter: number): number {
     const c = this.cost[perturb ? "perturbation" : "direct"];
-    return Math.max(8, Math.floor(this.budgetMs / (c * this.width * maxIter)));
+    return Math.max(1, Math.floor(this.budgetMs / (c * this.width * maxIter)));
   }
 
   render(f: Frame): Status {
     const gl = this.gl;
     const perturb = f.view.width < DIRECT_LIMIT;
     this.uploadPalette(f.palette);
+    this.bla = null;
     let reference: Status["reference"] = "none";
     if (perturb || f.target.width < DIRECT_LIMIT) {
-      const ref = this.refs.get(f.view, f.maxIter, f.target, f.targetIter, this.width);
+      const ref = this.refs.get(f.view, f.maxIter, f.target, f.targetIter, this.width, this.height);
       if (perturb && !ref) {
         // No orbit precise enough yet: keep the last image up until it comes.
         if (this.shown) this.display(f, this.shown.counts, this.shown.samples);
         this.lastWork = 0;
-        return { engine: "perturbation", sharp: false, samples: 0, scale: this.motionScale, reference: "waiting" };
+        return { engine: "perturbation", sharp: false, samples: 0, scale: this.motionScale, reference: "waiting", skipping: false };
       }
       if (perturb && ref) {
         this.uploadOrbit(ref);
+        this.bla = this.refs.table(ref, f.view, f.target, this.width, this.height);
+        if (this.bla) this.uploadBla(this.bla);
         reference = ref.bits === 0 ? "doubles" : ref.bits;
       }
     }
@@ -192,7 +222,7 @@ export class Renderer {
     if (f.moving || (!fullDone && !this.lowValid)) {
       // A quick, lower-resolution image: always complete, always on time.
       const c = this.cost[this.lastEngine];
-      this.motionScale = Math.min(1, Math.max(0.2, Math.sqrt(this.budgetMs / (c * this.width * this.height * f.maxIter))));
+      this.motionScale = Math.min(1, Math.max(MIN_MOTION_SCALE, Math.sqrt(this.budgetMs / (c * this.width * this.height * f.maxIter))));
       const w = Math.max(16, Math.round(this.width * this.motionScale));
       const h = Math.max(16, Math.round(this.height * this.motionScale));
       this.low = this.target(this.low, w, h, "count");
@@ -220,6 +250,7 @@ export class Renderer {
       samples: sharp ? Math.max(1, this.samples) : 0,
       scale: sharp ? 1 : this.motionScale,
       reference,
+      skipping: this.bla !== null,
     };
   }
 
@@ -325,6 +356,19 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.orbit);
     gl.uniform1i(pr.u.uOrbit, 1);
     gl.uniform1i(pr.u.uOrbitLen, this.orbitLen);
+    const t = perturb ? this.bla : null;
+    gl.uniform1i(pr.u.uBla, t ? 1 : 0);
+    if (t) {
+      gl.activeTexture(gl.TEXTURE4);
+      gl.bindTexture(gl.TEXTURE_2D, this.blaAB);
+      gl.uniform1i(pr.u.uBlaAB, 4);
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_2D, this.blaER);
+      gl.uniform1i(pr.u.uBlaER, 5);
+      gl.uniform1i(pr.u.uBlaLevels, Math.min(24, t.levels));
+      gl.uniform1iv(pr.u["uBlaOffset[0]"], this.blaOffsets);
+      gl.uniform1f(pr.u.uBlaMaxLogR, t.maxLogR);
+    }
   }
 
   private uploadPalette(p: Palette): void {
@@ -337,8 +381,8 @@ export class Renderer {
 
   /** The orbit of the reference, stored as float32: the perturbation needs no more. */
   private uploadOrbit(ref: Reference): void {
-    if (ref === this.uploaded) return;
-    this.uploaded = ref;
+    if (ref.orbit === this.uploaded) return;
+    this.uploaded = ref.orbit;
     const points = ref.orbit.length + 1;
     const rows = Math.ceil(points / ORBIT_ROW);
     const data = new Float32Array(rows * ORBIT_ROW * 2);
@@ -349,6 +393,20 @@ export class Renderer {
     this.orbitLen = ref.orbit.length;
     this.refCx = ref.cx;
     this.refCy = ref.cy;
+  }
+
+  /** The approximations: mantissas of A and B in one texture, exponents and radius in another. */
+  private uploadBla(t: BlaTable): void {
+    if (t === this.blaUploaded) return;
+    this.blaUploaded = t;
+    const gl = this.gl;
+    const rows = t.ab.length / 4 / BLA_ROW;
+    gl.bindTexture(gl.TEXTURE_2D, this.blaAB);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, BLA_ROW, rows, 0, gl.RGBA, gl.FLOAT, t.ab);
+    gl.bindTexture(gl.TEXTURE_2D, this.blaER);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, BLA_ROW, rows, 0, gl.RGBA, gl.FLOAT, t.er);
+    this.blaOffsets.fill(0);
+    t.offsets.slice(0, 24).forEach((o, i) => (this.blaOffsets[i] = o));
   }
 
   private texture(filter: number): WebGLTexture {

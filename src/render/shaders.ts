@@ -29,6 +29,12 @@ uniform float uPixelM;    // pixel size = uPixelM * 2^uPixelE
 uniform int uPixelE;
 uniform sampler2D uOrbit; // reference orbit Z_0..Z_n as RG32F, 4096 per row
 uniform int uOrbitLen;
+uniform int uBla;               // 1 when the approximations hold for every pixel of the view
+uniform sampler2D uBlaAB;       // mantissas of A and B, 4096 entries per row
+uniform sampler2D uBlaER;       // exponents of A and B, then log2 of the radius
+uniform int uBlaLevels;
+uniform int uBlaOffset[24];     // first entry of each level
+uniform float uBlaMaxLogR;
 
 const float BAILOUT2 = 65536.0;
 const int LEAVE = -100;          // an offset above 2^LEAVE fits a plain float again
@@ -43,6 +49,24 @@ float maxAbs(vec2 v) { return max(abs(v.x), abs(v.y)); }
 int expo(float x) { return ((floatBitsToInt(x) >> 23) & 255) - 127; }
 /** 2^k: 0 below the normal range, capped at 2^127. */
 float p2(int k) { return k < -126 ? 0.0 : intBitsToFloat((min(k, 127) + 127) << 23); }
+/** v 2^k in two steps, for k beyond the range of one power of two. */
+vec2 scale2(vec2 v, int k) { int h = k < 0 ? -(-k / 2) : k / 2; return v * p2(h) * p2(k - h); }
+/** log2 |dz| from above, without the undefined log2(0). */
+float logOf(float a) { return a > 0.0 ? log2(a) + 0.5 : -1e30; }
+ivec2 blaTexel(int k) { return ivec2(k & 4095, k >> 12); }
+
+/** Highest level l >= 1 whose approximation holds from step m for |dz| = 2^logDz, else 0. */
+int blaLevel(int m, float logDz) {
+  if (uBla == 0 || m < 1 || logDz >= uBlaMaxLogR) return 0;
+  int best = 0;
+  for (int l = 0; l < uBlaLevels; l++) {
+    int span = 1 << l;
+    if (((m - 1) & (span - 1)) != 0 || m + span > uOrbitLen) break;
+    if (logDz >= texelFetch(uBlaER, blaTexel(uBlaOffset[l] + ((m - 1) >> l)), 0).z) break;
+    best = l;
+  }
+  return best;
+}
 
 /** Continuous iteration count of the sample, or -1 inside the set. */
 float iterate() {
@@ -77,26 +101,48 @@ float iterate() {
     i = 1;
     bool plain = false;
     for (; i < uMaxIter; i++) {
-      vec2 Z = orbitAt(m);
-      float za = maxAbs(Z);
-      int E = max(max(za > 0.0 ? e + 1 + expo(za) : NONE, 2 * e), eC);
-      w = 2.0 * cmul(Z, w) * p2(e - E) + cmul(w, w) * p2(2 * e - E) + dcm * p2(ec - E);
-      e = E;
+      int l = blaLevel(m, float(e) + logOf(maxAbs(w)));
+      if (l > 0) {
+        // dz <- A dz + B dc, over 2^l steps at once
+        int t = uBlaOffset[l] + ((m - 1) >> l);
+        vec4 ab = texelFetch(uBlaAB, blaTexel(t), 0);
+        vec4 er = texelFetch(uBlaER, blaTexel(t), 0);
+        int ae = int(er.x);
+        int be = int(er.y);
+        vec2 aw = cmul(ab.xy, w);
+        vec2 bd = cmul(ab.zw, dcm);
+        float awa = maxAbs(aw);
+        float bda = maxAbs(bd);
+        int E = max(awa > 0.0 ? ae + e + expo(awa) : NONE, bda > 0.0 ? be + ec + expo(bda) : NONE);
+        w = aw * p2(ae + e - E) + bd * p2(be + ec - E);
+        e = E;
+        m += 1 << l;
+        i += (1 << l) - 1;
+      } else {
+        vec2 Z = orbitAt(m);
+        float za = maxAbs(Z);
+        int E = max(max(za > 0.0 ? e + 1 + expo(za) : NONE, 2 * e), eC);
+        w = 2.0 * cmul(Z, w) * p2(e - E) + cmul(w, w) * p2(2 * e - E) + dcm * p2(ec - E);
+        e = E;
+        m++;
+      }
       wa = maxAbs(w);
       if (wa > 0.0) { int k = expo(wa); w *= p2(-k); e += k; }
-      m++;
-      if (e > LEAVE || m == uOrbitLen) {
+      if (e > LEAVE || m >= uOrbitLen) {
         dz = w * p2(e);
         plain = true;
         break;
       }
       vec2 Zm = orbitAt(m);
       float zma = maxAbs(Zm);
-      if (zma > 0.0 && zma < SMALL_Z) {
-        // z = Z + dz with both small: rebase when z comes closer to 0 than dz.
+      if (zma == 0.0) {
+        // Z is 0, so z = dz: rebasing changes nothing but brings the skips back in step.
+        m = 0;
+      } else if (zma < SMALL_Z) {
+        // z = Z + dz with both small: rebase when z comes no further from 0 than dz.
         int ez = max(expo(zma), e);
         vec2 zm = Zm * p2(-ez) + w * p2(e - ez);
-        if (dot(zm, zm) < dot(w, w) * p2(2 * (e - ez))) {
+        if (dot(zm, zm) <= dot(w, w) * p2(2 * (e - ez))) {
           w = zm;
           e = ez;
           wa = maxAbs(w);
@@ -111,7 +157,7 @@ float iterate() {
     vec2 z = orbitAt(m) + dz;
     float r2 = dot(z, z);
     if (r2 > BAILOUT2) return smoothCount(i, r2);
-    if (r2 < dot(dz, dz) || m == uOrbitLen) {
+    if (r2 <= dot(dz, dz) || m >= uOrbitLen) {
       dz = z;
       m = 0;
     }
@@ -122,13 +168,23 @@ float iterate() {
 
   // dz <- 2 Z dz + dz^2 + dc, z = Z + dz, rebasing to the start of the orbit when needed.
   for (; i < uMaxIter; i++) {
-    vec2 Z = orbitAt(m);
-    dz = 2.0 * cmul(Z, dz) + cmul(dz, dz) + dc;
-    m++;
+    int l = blaLevel(m, logOf(maxAbs(dz)));
+    if (l > 0) {
+      int t = uBlaOffset[l] + ((m - 1) >> l);
+      vec4 ab = texelFetch(uBlaAB, blaTexel(t), 0);
+      vec4 er = texelFetch(uBlaER, blaTexel(t), 0);
+      dz = scale2(cmul(ab.xy, dz), int(er.x)) + scale2(cmul(ab.zw, dc), int(er.y));
+      m += 1 << l;
+      i += (1 << l) - 1;
+    } else {
+      vec2 Z = orbitAt(m);
+      dz = 2.0 * cmul(Z, dz) + cmul(dz, dz) + dc;
+      m++;
+    }
     vec2 z = orbitAt(m) + dz;
     float r2 = dot(z, z);
     if (r2 > BAILOUT2) return smoothCount(i, r2);
-    if (r2 < dot(dz, dz) || m == uOrbitLen) {
+    if (r2 <= dot(dz, dz) || m >= uOrbitLen) {
       dz = z;
       m = 0;
     }

@@ -524,7 +524,7 @@ function frame(now: number): void {
           ? "doubles"
           : status.reference === "waiting"
             ? "computing…"
-            : `${status.reference} bits`;
+            : `${status.reference} bits${status.skipping ? " + BLA" : ""}`;
     $("hud-image").textContent = status.reference === "waiting"
       ? "waiting for the orbit"
       : status.sharp

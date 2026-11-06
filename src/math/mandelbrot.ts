@@ -120,7 +120,7 @@ export function iteratePerturbed(orbit: Orbit, dcre: number, dcim: number, maxIt
     const y = Z[2 * m + 1] + dy;
     const r2 = x * x + y * y;
     if (r2 > BAILOUT2) return smooth(i, r2);
-    if (r2 < dx * dx + dy * dy || m === orbit.length) {
+    if (r2 <= dx * dx + dy * dy || m === orbit.length) {
       dx = x;
       dy = y;
       m = 0;

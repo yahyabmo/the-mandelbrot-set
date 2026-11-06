@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { iterateScaled, p2, splitPixel, expo, f } from "../src/math/deep";
+import { buildBla } from "../src/math/bla";
+import { expo, f, iterateGpu, offsetOf, p2, splitPixel } from "../src/math/deep";
 import { FRAC, fromDecimal, fromNumber, type Fixed } from "../src/math/fixed";
 import { bitsFor, iteratePerturbed, preciseOrbit } from "../src/math/mandelbrot";
 import { iterateExactAt } from "./exact";
@@ -32,32 +33,42 @@ const W = 1440;
 const close = (a: number, exact: number) => (a < 0 && exact < 0) || (a >= 0 && exact >= 0 && Math.abs(a - exact) < 0.05);
 
 /**
- * Compare the float32 deep method with exact iteration on random pixels of a view, and
- * with the same perturbation in doubles, which has no range problem down there.
+ * Compare the shader's method with exact iteration on random pixels of a view, with and
+ * without the bilinear approximation, and with the same perturbation in doubles.
  */
 function agreement(cx: Fixed, cy: Fixed, width: number, maxIter: number, n = 48) {
   const pixel = width / W;
   const orbit = preciseOrbit(cx, cy, bitsFor(pixel), maxIter);
   const z32 = Float32Array.from(orbit.data);
-  const [pm, pe] = splitPixel(pixel);
+  const dcMax = Math.hypot(W, W * 0.6) * 0.5 * pixel;
+  const bla = buildBla(orbit, dcMax);
   const exactBits = Math.min(FRAC, bitsFor(pixel) + 24);
   const next = random(5);
-  let deep = 0;
+  let gpu = 0;
+  let withBla = 0;
   let double = 0;
+  let steps = 0;
+  let blaSteps = 0;
+  let iterations = 0;
   const values: number[] = [];
   for (let k = 0; k < n; k++) {
     const dpx = (next() - 0.5) * W;
     const dpy = (next() - 0.5) * W * 0.6;
-    // The very offset the float32 method uses, so that all three iterate the same c.
-    const dx = f(dpx * pm) * 2 ** pe;
-    const dy = f(dpy * pm) * 2 ** pe;
+    // The very offset the GPU uses, so that all methods iterate the same c.
+    const dx = offsetOf(dpx, pixel);
+    const dy = offsetOf(dpy, pixel);
     const exact = iterateExactAt(cx + fromNumber(dx), cy + fromNumber(dy), maxIter, exactBits);
-    const v = iterateScaled(z32, orbit.length, dpx, dpy, pm, pe, maxIter);
-    values.push(v);
-    if (close(v, exact)) deep++;
+    const plain = iterateGpu(z32, orbit.length, dpx, dpy, pixel, maxIter);
+    const skipping = iterateGpu(z32, orbit.length, dpx, dpy, pixel, maxIter, bla);
+    values.push(plain.value);
+    if (close(plain.value, exact)) gpu++;
+    if (close(skipping.value, exact)) withBla++;
     if (close(iteratePerturbed(orbit, dx, dy, maxIter), exact)) double++;
+    steps += plain.steps;
+    blaSteps += skipping.steps;
+    iterations += exact < 0 ? maxIter : Math.ceil(exact);
   }
-  return { deep: deep / n, double: double / n, values };
+  return { gpu: gpu / n, bla: withBla / n, double: double / n, values, saved: 1 - blaSteps / steps, iterations };
 }
 
 describe("float32 helpers of the shader", () => {
@@ -86,27 +97,46 @@ describe("float32 helpers of the shader", () => {
   });
 });
 
-describe("offsets with their own exponent", () => {
-  const dendrite = [1e-35, 1e-120, 1e-290];
-  for (const width of dendrite) {
-    it(`match exact iteration around the Misiurewicz point c = i, width ${width}`, () => {
-      const { deep, double, values } = agreement(0n, fromNumber(1), width, 3000);
-      expect(values.some((v) => v > 0)).toBe(true);
-      expect(deep).toBeGreaterThan(0.95);
-      expect(deep).toBeGreaterThanOrEqual(double - 0.05);
+describe("the shader's perturbation", () => {
+  const views = [
+    { name: "the 2023 point at 10¹⁷, plain floats", re: "-1.78780638350855487198076170", im: "0.00005689075511288150404139", width: 3e-17, maxIter: 3000 },
+    { name: "the tip c = -2 at 10²⁵, plain floats", re: "-2", im: "0", width: 1e-25, maxIter: 3000 },
+    { name: "c = i at 10³⁵, own exponents", re: "0", im: "1", width: 1e-35, maxIter: 3000 },
+    { name: "c = i at 10¹²⁰", re: "0", im: "1", width: 1e-120, maxIter: 3000 },
+    { name: "c = i at 10²⁹⁰", re: "0", im: "1", width: 1e-290, maxIter: 3000 },
+    { name: "the 2023 point at 10⁴⁰", re: "-1.78780638350855487198076170", im: "0.00005689075511288150404139", width: 1e-40, maxIter: 3000 },
+  ];
+  for (const { name, re, im, width, maxIter } of views) {
+    it(`matches exact iteration, with and without skipping: ${name}`, () => {
+      const r = agreement(fromDecimal(re), fromDecimal(im), width, maxIter);
+      expect(r.values.some((v) => v > 0)).toBe(true);
+      expect(r.gpu).toBeGreaterThan(0.95);
+      expect(r.gpu).toBeGreaterThanOrEqual(r.double - 0.05);
+      expect(r.bla).toBeGreaterThan(0.95);
     });
   }
 
-  it("match exact iteration at the point of the 2023 script, 10⁴⁰ deep", () => {
-    const { deep } = agreement(fromDecimal("-1.78780638350855487198076170"), fromDecimal("0.00005689075511288150404139"), 1e-40, 3000);
-    expect(deep).toBeGreaterThan(0.95);
-  });
-
-  it("keep every point inside a minibrot whose reference returns to 0", () => {
+  it("keeps every point inside a minibrot whose reference returns to 0", () => {
     // The nucleus of the period-3 minibrot: its orbit comes back exactly to 0 every 3 steps,
     // where the term 2 Z dz vanishes and dz^2 + dc must not underflow.
     const c = realNucleus(-1.7548776662466927, 3, 400);
-    const { values } = agreement(c, 0n, 1e-50, 1500, 24);
-    expect(values.every((v) => v === -1)).toBe(true);
+    const r = agreement(c, 0n, 1e-50, 1500, 24);
+    expect(r.values.every((v) => v === -1)).toBe(true);
+    expect(r.bla).toBe(1);
+  });
+
+  it("skips most steps of each period inside a minibrot of period 13", () => {
+    // No approximation holds across the return to 0: each period takes a step from 0,
+    // then skips of 8 and 4, so 10 steps in 13 are saved.
+    const c = realNucleus(-1.99, 13, 400);
+    const r = agreement(c, 0n, 1e-50, 3000, 16);
+    expect(r.values.every((v) => v === -1)).toBe(true);
+    expect(r.bla).toBe(1);
+    expect(r.saved).toBeGreaterThan(0.75);
+  });
+
+  it("skips most of the steps of a deep dendrite", () => {
+    const r = agreement(0n, fromNumber(1), 1e-120, 3000, 16);
+    expect(r.saved).toBeGreaterThan(0.5);
   });
 });
