@@ -1,6 +1,6 @@
 # Mandelbrot Odyssey
 
-A real-time journey into the Mandelbrot set, computed live on your graphics card. Scroll into a spiral, fly to the famous places of the set, change the colours as you go, and dive to a magnification of a thousand billion, smoothly.
+A real-time journey into the Mandelbrot set, computed live on your graphics card. Scroll into a spiral, fly to the famous places of the set, change the colours as you go, and dive to a magnification of 10³⁰⁰, smoothly.
 
 ## Installation
 
@@ -54,37 +54,39 @@ npm start
 
 ## Screenshots
 
-![The whole Mandelbrot set, with the panel of places and colours](docs/screenshots/home.jpg)
+![The whole Mandelbrot set, with the index of places and colours](docs/screenshots/home.jpg)
 
-*The whole set. On the right, eight famous places and seven palettes; on the left, the zoom, the coordinates and the engine at work.*
+*The whole set. On the right, the index: places, palettes, detail. On the left, the depth gauge, from 10⁰ to 10³⁰⁰, and the readout of the engine at work.*
 
-![Seahorse valley](docs/screenshots/seahorses.jpg)
+![The index of places, open](docs/screenshots/places.jpg)
 
-*Seahorse valley, between the main cardioid and its largest bulb.*
+*Nine places in a drop-down list, from the whole set down to the bottom of the map. The keys 1 to 9 fly there too.*
 
 ![A double spiral 100 000 times closer](docs/screenshots/spiral.jpg)
 
-*A double spiral at a magnification of 10⁵, computed with perturbations around a reference orbit.*
+*A double spiral at a magnification of 10⁵.*
 
 | | |
 | :-: | :-: |
-| ![Elephant valley in the Glacier palette](docs/screenshots/elephants.jpg) | ![Lightning around a bulb in the Ember palette](docs/screenshots/lightning.jpg) |
-| *Elephant valley, Glacier* | *Lightning, Ember* |
+| ![Seahorse valley](docs/screenshots/seahorses.jpg) | ![Elephant valley in the Glacier palette](docs/screenshots/elephants.jpg) |
+| *Seahorse valley* | *Elephant valley, Glacier* |
+| ![Lightning around a bulb in the Ember palette](docs/screenshots/lightning.jpg) | ![The last frame of the 2023 script](docs/screenshots/dive-2023.jpg) |
+| *Lightning, Ember* | *The 2023 dive, 10¹⁸ deep* |
 
-![The point of the original 2023 script at a magnification of a billion](docs/screenshots/dive-2023.jpg)
+![The dendrite at c = i, 10^290 times closer](docs/screenshots/bottom.jpg)
 
-*The 2023 dive: the point of the original script, a billion times closer, in its own Turbo colours.*
+*The bottom of the map: the dendrite at c = i, 4.5 × 10²⁹⁰ times closer, computed with a reference orbit of 1030 bits. The same branches as at the top: c = i is a Misiurewicz point, where the set looks alike at every scale.*
 
 <p align="center">
   <img src="docs/screenshots/mobile.jpg" alt="The spiral on a phone" width="300">
 </p>
 
-<p align="center"><em>On a phone: pinch to zoom, drag to move, and the panel folds away.</em></p>
+<p align="center"><em>On a phone: pinch to zoom, drag to move, and the index folds away.</em></p>
 
 ## What you can do
 
-- **Zoom anywhere.** Scroll or pinch to zoom around the pointer, drag to move, and let go to glide. Double-click dives four times closer, <kbd>Shift</kbd> + double-click goes back.
-- **Fly to famous places.** Seahorse valley, a double spiral, elephant valley, a minibrot copy of the whole set, the dendrite at c = i, and the point of the original script. Each flight eases in log space, so a jump of nine orders of magnitude still feels even.
+- **Zoom anywhere, as deep as 10³⁰⁰.** Scroll or pinch to zoom around the pointer, drag to move, and let go to glide. Double-click dives four times closer, <kbd>Shift</kbd> + double-click goes back. The point under the pointer stays exactly where it is all along the zoom.
+- **Fly to famous places.** Seahorse valley, a double spiral, elephant valley, a minibrot copy of the whole set, the dendrite at c = i, the end of the original 2023 script at 10¹⁸, and the bottom of the map at 10²⁹⁰. A flight to a place out of sight first pulls back until it is in view, then dives, faster the deeper it goes: 10¹⁸ in about five seconds, 10²⁹⁰ in under twenty.
 - **Colour it.** Seven palettes, including *Turbo 2023*, the colours of the original script: 150 steps of Turbo, up and back down. Change the density and the shift, or let the colours flow. Colours change instantly, without recomputing the image.
 - **Always smooth.** While you move, the image is computed at a lower resolution that fits in the frame budget. When you stop, it sharpens, then smooths its edges with up to 12 samples per pixel.
 - **Share it.** The address always holds the current view: copy the link and anyone opens the same place, with the same colours. Save the image as a PNG.
@@ -98,7 +100,7 @@ npm start
 | double-click | dive ×4 (<kbd>Shift</kbd>: back ×4) |
 | <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> | move |
 | <kbd>+</kbd> <kbd>−</kbd> | zoom on the centre |
-| <kbd>1</kbd>–<kbd>8</kbd> | famous places |
+| <kbd>1</kbd>–<kbd>9</kbd> | famous places |
 | <kbd>C</kbd> | flowing colours |
 | <kbd>S</kbd> | save the image |
 | <kbd>H</kbd> | hide the panels |
@@ -108,25 +110,31 @@ npm start
 
 Every pixel is a complex number c. The explorer iterates z → z² + c from z = 0 and counts the steps before |z| grows past 256. Points that never escape belong to the set and stay dark. The others are coloured by a *continuous* count, n − log₂(log₂|z|²) + 4, which removes the bands of a plain count.
 
-Graphics cards compute in 32-bit floats, which blur the image past a magnification of about 10⁴. Below that, the explorer uses **perturbation theory**:
+Graphics cards compute in 32-bit floats, which blur the image past a magnification of about 10⁴. Below that, the explorer uses **perturbation theory**, with four refinements:
 
-1. One *reference orbit* Zₙ is computed on the CPU, in double precision, at the centre of the view.
-2. Each pixel only follows its small offset from it, `dz ← 2·Z·dz + dz² + dc`, which 32-bit floats hold without trouble.
-3. **Rebasing:** when a pixel's orbit comes closer to zero than its offset, or the reference runs out, the pixel restarts against the beginning of the same orbit. One reference then serves the whole image, without the glitches of the plain method.
+1. **A reference orbit in arbitrary precision.** One orbit Zₙ is computed at the centre of the view, in fixed point with as many bits as the depth needs: 125 bits at 10¹⁸, 1030 at 10²⁹⁰. A Web Worker computes it, so the view keeps moving meanwhile, and it starts as soon as a flight heads somewhere deep, so that the orbit is often ready on arrival.
+2. **Offsets in 32-bit floats.** Each pixel only follows its small offset from the reference, `dz ← 2·Z·dz + dz² + dc`. Below a pixel size of 2⁻¹⁰⁰ that offset no longer fits a float, whose smallest value is 2⁻¹²⁶: it then carries its own exponent, renormalised at every step, until it has grown large enough to be a plain float again.
+3. **Rebasing.** When a pixel's orbit comes closer to zero than its offset, or the reference runs out, the pixel restarts against the beginning of the same orbit. One reference then serves the whole image, without the glitches of the plain method.
+4. **Bilinear approximation.** While the offset stays small next to the reference, many steps in a row reduce to `dz → A·dz + B·dc`. The worker precomputes A and B for runs of 2, 4, 8… steps, each with the radius within which it holds, and the shader skips the longest run that does. At 10²⁹⁰ this computes 26 times fewer steps.
 
-The tests check the CPU version of both methods against an exact 400-bit computation: the perturbation is as accurate as plain double precision, and the shaders follow the same code line for line.
+**Tested against exact arithmetic.** The shader's method is also written in TypeScript, line for line, in 32-bit float arithmetic that flushes tiny values to zero as GPUs do. The tests check it against iteration in exact fixed point, with over a thousand bits at the deepest, from 10¹⁷ down to 10²⁹⁰, with and without skipping. A check in the browser then compares the counts the GPU computed with that copy, pixel by pixel: they agree to within 3 × 10⁻⁵.
 
-**Depth.** This version reaches a magnification of about 10¹², the limit of a double-precision reference. An arbitrary-precision reference orbit, with deltas that carry their own exponent, comes next, to reach 10¹⁸ and beyond.
+**Speed.** On an integrated AMD Radeon (Ryzen 7 5825U), measured in Chrome: during flights to 10⁵, 10¹⁸ and 10²⁹⁰ and back, one frame in about 3800 took longer than a screen refresh while the view was moving. A full image at 10²⁹⁰ takes 4 ms to compute with the approximation, 76 ms without. The renderer learns what one iteration costs on your GPU and sizes every frame to fit the screen refresh; while the view rests, it tries a little more work each frame to sharpen sooner.
 
-**Speed.** On an integrated AMD Radeon (Ryzen 7 5825U), measured in Chrome: no frame took longer than 33 ms during flights to 10⁵ and to 10⁹, out of 542 frames. The renderer learns what one iteration costs on your GPU and sizes every frame to fit the screen refresh.
+**Depth.** The limit is a magnification of about 10³⁰⁰, where the size of a pixel stops being an ordinary double. One case is still slow: deep inside a minibrot of small period, every pixel runs all its iterations, and no approximation holds across the returns of its orbit to zero, so the image sharpens in seconds rather than at once.
 
 ```
-src/math/mandelbrot.ts   iteration, reference orbit, perturbation with rebasing (CPU, tested)
-src/math/view.ts         view, zoom around a point, easing in log space
+src/math/fixed.ts        numbers in fixed point on BigInt, for centres beyond double precision
+src/math/mandelbrot.ts   iteration, reference orbits in doubles and in fixed point, perturbation (CPU, tested)
+src/math/deep.ts         the shader's perturbation in 32-bit floats, with offsets that carry an exponent
+src/math/bla.ts          the table of bilinear approximations
+src/math/view.ts         view, zoom around a point, flights
 src/render/shaders.ts    the same iteration in GLSL, colouring, display
+src/render/reference.ts  which reference to draw with, and when to ask for a new one
+src/render/orbit-worker.ts  deep orbits and their tables, off the page
 src/render/renderer.ts   progressive rendering, frame budget, supersampling
 src/color/palettes.ts    palettes, Turbo from OpenCV
-src/main.ts              navigation, panel, HUD, shared links
+src/main.ts              navigation, index, readout, shared links
 legacy/mandelbrot.py     the original 2023 script
 ```
 
@@ -144,7 +152,7 @@ The site runs locally. `.github/workflows/ci.yml` runs the tests and the build o
 ## Roadmap
 
 - [x] **Phase 1.** Real-time explorer: smooth navigation, perturbation to 10¹², palettes, places, shared links, image export.
-- [ ] **Phase 2.** Deep zoom: arbitrary-precision reference, exponent-carrying deltas, bilinear approximation, the 2023 dive to 10¹⁸ and beyond.
+- [x] **Phase 2.** Deep zoom to 10³⁰⁰: arbitrary-precision reference in a worker, offsets that carry their own exponent, bilinear approximation, the 2023 dive to 10¹⁸.
 - [ ] **Phase 3.** Atlas: periods of the bulbs, live orbits, Julia sets under the pointer, external rays, π in seahorse valley.
 - [ ] **Phase 4.** Odyssey: an interactive story in eight chapters, driven by the live explorer.
 - [ ] **Phase 5.** Senses: orbits as sound, an endless automatic dive, video export.
@@ -153,5 +161,5 @@ The site runs locally. `.github/workflows/ci.yml` runs the tests and the build o
 ## Credits
 
 - The Turbo colormap is by Google (Apache-2.0), read from OpenCV's `COLORMAP_TURBO`.
-- Perturbation for deep zoom was introduced by K. I. Martin; rebasing comes from the Fractal Forums community. The continuous count follows Inigo Quilez's article on smooth iteration.
+- Perturbation for deep zoom was introduced by K. I. Martin. Rebasing and the bilinear approximation were introduced by Zhuoran on Fractal Forums. The continuous count follows Inigo Quilez's article on smooth iteration.
 - The original 2023 script, kept in [`legacy/`](legacy/), rendered this zoom one image at a time with 80-bit arithmetic.
