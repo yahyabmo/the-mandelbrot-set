@@ -4,6 +4,7 @@ import { fromNumber, toNumber } from "../src/math/fixed";
 import {
   clampWidth,
   ease,
+  fitView,
   flightPath,
   HOME,
   inSight,
@@ -122,6 +123,17 @@ describe("view", () => {
     expect(zoomRate(3)).toBe(8);
     expect(zoomRate(-90)).toBe(30);
     expect(zoomRate(690)).toBe(60);
+  });
+
+  it("frames a view inside the part of the screen that panels leave free", () => {
+    const content = viewOf("-0.5", "0.5", 1);
+    const free = { x0: 400, y0: 0, x1: 1000, y1: 900 };
+    const v = fitView(content, 0.5, free, W, H);
+    // The content, 1 wide, fills the 600 free pixels, and its centre sits in their middle.
+    expect(v.width).toBeCloseTo(W / 600, 12);
+    const [re, im] = num(toComplex(v, 700, 450, W, H));
+    expect(re).toBeCloseTo(-0.5, 12);
+    expect(im).toBeCloseTo(0.5, 12);
   });
 
   it("limits the speed of a long zoom", () => {

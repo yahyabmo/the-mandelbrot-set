@@ -128,3 +128,23 @@ export function flightPath(from: View, to: View): View[] {
 export function inSight(v: View, to: View): boolean {
   return distanceInWidths(v, to) < IN_SIGHT;
 }
+
+/** A rectangle of the screen, in CSS pixels. */
+export interface Rect {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * The view that shows `content`, `height` tall, inside a free rectangle of the screen
+ * rather than across all of it: the parts of the screen outside it stay covered by panels.
+ */
+export function fitView(content: View, height: number, free: Rect, wPx: number, hPx: number): View {
+  const s = Math.max(content.width / Math.max(1, free.x1 - free.x0), height / Math.max(1, free.y1 - free.y0));
+  // Screen y grows downwards, the imaginary axis upwards.
+  const dx = ((free.x0 + free.x1) / 2 - wPx / 2) * s;
+  const dy = ((free.y0 + free.y1) / 2 - hPx / 2) * s;
+  return { cx: content.cx - fromNumber(dx), cy: content.cy + fromNumber(dy), width: clampWidth(s * wPx) };
+}
