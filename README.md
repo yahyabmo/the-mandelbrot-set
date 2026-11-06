@@ -1,6 +1,6 @@
 # Mandelbrot Odyssey
 
-A real-time journey into the Mandelbrot set, computed live on your graphics card. Scroll into a spiral, fly to the famous places of the set, dive to a magnification of 10³⁰⁰, smoothly, and read the mathematics of what you see in a live atlas: Julia sets, orbits, periods, external rays, and π.
+A real-time journey into the Mandelbrot set, computed live on your graphics card. Scroll into a spiral, fly to the famous places of the set, dive to a magnification of 10³⁰⁰, smoothly, and read the mathematics of what you see in a live atlas: Julia sets, orbits, periods, external rays, and π. Or follow the Odyssey, a story in eight chapters told by the explorer itself.
 
 ## Installation
 
@@ -58,6 +58,10 @@ npm start
 
 *The whole set. On the right, the index: places, atlas, palettes, detail. On the left, the depth gauge, from 10⁰ to 10³⁰⁰, and the readout of the engine at work. At the bottom, the lens: the Julia set of the point under the pointer, here c = −3/4.*
 
+![Chapter III of the Odyssey, with the bulb of period 5 found](docs/screenshots/odyssey.jpg)
+
+*The Odyssey, chapter III. The story frames each place in the part of the screen it leaves free, switches on the layers that explain it, and checks its task live: here the pointer has found a bulb of period 5, whose Julia set the lens shows with its five-pointed orbit.*
+
 ![The atlas: the Julia set of the period-3 bulb, its external rays and Lavaurs' diagram](docs/screenshots/atlas.jpg)
 
 *The atlas. The pointer is in the bulb of period 3 at the top: the lens shows its Julia set, Douady's rabbit, and the orbit of 0 settling on a cycle of 3 points. The ring marks the component, and the rays 1/7 and 2/7, which land at its root, are lit, along with their chord in Lavaurs' diagram.*
@@ -86,15 +90,16 @@ npm start
 *The bottom of the map: the dendrite at c = i, 4.5 × 10²⁹⁰ times closer, computed with a reference orbit of 1030 bits. The same branches as at the top: c = i is a Misiurewicz point, where the set looks alike at every scale.*
 
 <p align="center">
-  <img src="docs/screenshots/mobile.jpg" alt="The spiral on a phone" width="300">
+  <img src="docs/screenshots/mobile.jpg" alt="Chapter VI of the Odyssey on a phone" width="300">
 </p>
 
-<p align="center"><em>On a phone: pinch to zoom, drag to move, and the index folds away.</em></p>
+<p align="center"><em>On a phone: pinch to zoom, drag to move. The story becomes a sheet at the bottom, the lens sits at the top and reads the point under the cross.</em></p>
 
 ## What you can do
 
 - **Zoom anywhere, as deep as 10³⁰⁰.** Scroll or pinch to zoom around the pointer, drag to move, and let go to glide. Double-click dives four times closer, <kbd>Shift</kbd> + double-click goes back. The point under the pointer stays exactly where it is all along the zoom.
 - **Fly to famous places.** Seahorse valley, a double spiral, elephant valley, a minibrot copy of the whole set, the dendrite at c = i, the end of the original 2023 script at 10¹⁸, and the bottom of the map at 10²⁹⁰. A flight to a place out of sight first pulls back until it is in view, then dives, faster the deeper it goes: 10¹⁸ in about five seconds, 10²⁹⁰ in under twenty.
+- **Follow the Odyssey.** Eight short chapters, from the one rule of the set to the bottom of the map at 10²⁹⁰: one rule, connected or dust, bulbs and periods, a map of rays, π in seahorse valley, copies of itself, diving, the bottom of the map. Each flies to its place and gives a small task, checked as you move. Every chapter has its own link, such as `#chapter=5`.
 - **Read the atlas.** Move the pointer and the lens shows the Julia set of that point, with the orbit of 0 drawn on it: connected inside the set, dust outside. The component under the pointer is ringed, with its period and size, found by Newton's method. Turn on the external rays to see the rays of every component up to period 6, labelled by their angles, and Lavaurs' diagram, the map of how they pair: pick a chord and the explorer flies to its component. The π experiment shows why π appears in seahorse valley and at the cusp.
 - **Colour it.** Seven palettes, including *Turbo 2023*, the colours of the original script: 150 steps of Turbo, up and back down. Change the density and the shift, or let the colours flow. Colours change instantly, without recomputing the image.
 - **Always smooth.** While you move, the image is computed at a lower resolution that fits in the frame budget. When you stop, it sharpens, then smooths its edges with up to 12 samples per pixel.
@@ -114,6 +119,8 @@ npm start
 | <kbd>S</kbd> | save the image |
 | <kbd>H</kbd> | hide the panels |
 | <kbd>R</kbd> | back to the whole set |
+| <kbd>Page Down</kbd> <kbd>Page Up</kbd> | next and previous chapter of the Odyssey |
+| <kbd>Esc</kbd> | close the Odyssey |
 
 ## How it works
 
@@ -142,6 +149,7 @@ src/math/bla.ts          the table of bilinear approximations
 src/math/view.ts         view, zoom around a point, flights
 src/math/atlas.ts        orbits, periods, nuclei, sizes, external rays, Lavaurs' diagram, π (tested)
 src/atlas/               the lens, the drawings over the image, Lavaurs' diagram, the atlas worker
+src/story/               the eight chapters of the Odyssey and their tasks (tested), the story plate
 src/render/shaders.ts    the same iteration in GLSL, colouring, display
 src/render/reference.ts  which reference to draw with, and when to ask for a new one
 src/render/orbit-worker.ts  deep orbits and their tables, off the page
@@ -167,7 +175,7 @@ The site runs locally. `.github/workflows/ci.yml` runs the tests and the build o
 - [x] **Phase 1.** Real-time explorer: smooth navigation, perturbation to 10¹², palettes, places, shared links, image export.
 - [x] **Phase 2.** Deep zoom to 10³⁰⁰: arbitrary-precision reference in a worker, offsets that carry their own exponent, bilinear approximation, the 2023 dive to 10¹⁸.
 - [x] **Phase 3.** Atlas: Julia sets and orbits under the pointer, periods and sizes of components, external rays, Lavaurs' diagram, π in seahorse valley.
-- [ ] **Phase 4.** Odyssey: an interactive story in eight chapters, driven by the live explorer.
+- [x] **Phase 4.** Odyssey: an interactive story in eight chapters, driven by the live explorer, with live tasks.
 - [ ] **Phase 5.** Senses: orbits as sound, an endless automatic dive, video export.
 - [ ] **Phase 6.** Buddhabrot, 3D relief, other fractals.
 
