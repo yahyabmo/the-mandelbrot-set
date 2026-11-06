@@ -24,6 +24,8 @@ uniform vec2 uRefPx;      // view centre minus the reference point, in pixels
 uniform vec2 uJitter;     // sub-pixel offset of this sample
 uniform int uMaxIter;
 uniform int uPerturb;     // 0: direct float32, 1: perturbation around the reference orbit
+uniform int uFormula;     // 0: z^2 + c; 1: Burning Ship; 2: Tricorn; 3: z^3 + c; 4: z^4 + c (direct only)
+uniform float uPower;     // the power of z in the rule, for the smooth count
 uniform int uScaled;      // 1: pixels too small for a float32, the offsets carry an exponent
 uniform float uPixelM;    // pixel size = uPixelM * 2^uPixelE
 uniform int uPixelE;
@@ -75,11 +77,17 @@ float iterate() {
   vec2 px = gl_FragCoord.xy + uJitter - 0.5 * uSize;
   if (uPerturb == 0) {
     vec2 c = uCenter + px * uPixel;
+    // The Burning Ship is drawn upside down, as is the custom.
+    if (uFormula == 1) c.y = -c.y;
     vec2 z = vec2(0.0);
     for (int i = 0; i < uMaxIter; i++) {
-      z = cmul(z, z) + c;
+      if (uFormula == 1) z = abs(z);
+      else if (uFormula == 2) z.y = -z.y;
+      vec2 z2 = cmul(z, z);
+      z = (uFormula == 3 ? cmul(z2, z) : uFormula == 4 ? cmul(z2, z2) : z2) + c;
       float r2 = dot(z, z);
-      if (r2 > BAILOUT2) return smoothCount(i, r2);
+      // The smooth count of a rule of power d: i - log_d(log2 |z|^2 / log2 B^2).
+      if (r2 > BAILOUT2) return float(i) - log2(log2(r2) / 16.0) / log2(uPower);
     }
     return -1.0;
   }

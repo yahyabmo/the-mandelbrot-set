@@ -5,6 +5,7 @@ import { autoIterations } from "./math/iterations";
 import { toDecimal, toNumber } from "./math/fixed";
 import { ease, flightPath, HOME_WIDTH, homeView, inSight, MIN_WIDTH, panBy, settled, zoomAt, zoomRate, type View } from "./math/view";
 import { PLACES, type Place } from "./places";
+import { WORLDS, worldById, worldHome, type World } from "./worlds";
 import { Renderer, type Status } from "./render/renderer";
 import { Story } from "./story/story";
 import { AutoDive } from "./dive/autodive";
@@ -47,6 +48,7 @@ const state = {
   target: initial.view as View,
   current: initial.view as View,
   palette: paletteById(initial.palette),
+  world: worldById(initial.world),
   density: initial.density,
   offset: initial.offset,
   detail: initial.detail,
@@ -218,6 +220,7 @@ if (innerWidth <= 720) {
 }
 
 function syncPanel(): void {
+  worldButtons.forEach((b, i) => b.classList.toggle("active", WORLDS[i] === state.world));
   const place = PLACES.findIndex((p) => p.id === state.place);
   $("place-key").textContent = place >= 0 ? String(place + 1) : "–";
   $("place-name").textContent = place >= 0 ? PLACES[place].name : "Off the map";
@@ -245,8 +248,45 @@ function flyTo(v: View): void {
   state.target = route.shift()!;
 }
 
+/** Enter another world, at its home view unless `fly` is false. */
+function setWorld(world: World, fly = true): void {
+  if (world !== state.world) {
+    state.world = world;
+    atlas.setEnabled(world.formula === 0);
+    if (world.formula !== 0) {
+      dive.stop();
+      story.close();
+      toast(`${world.name}: ${world.rule}`);
+    }
+  }
+  if (fly) flyTo(world.formula === 0 ? homeView(...size()) : worldHome(world, ...size()));
+  state.place = null;
+  syncPanel();
+}
+
+const worldButtons = WORLDS.map((world) => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "world";
+  b.innerHTML = "<b></b><span></span>";
+  b.querySelector("b")!.textContent = world.name;
+  b.querySelector("span")!.textContent = world.rule;
+  if (world.highlight) b.title = `Click again for ${world.highlight.name}`;
+  b.addEventListener("click", () => {
+    interacted();
+    if (world === state.world && world.highlight) {
+      flyTo({ ...world.highlight.view });
+      if (world.highlight.palette) state.palette = paletteById(world.highlight.palette);
+      syncPanel();
+    } else setWorld(world);
+  });
+  $("worlds").append(b);
+  return b;
+});
+
 function goTo(p: Place): void {
   const [w, h] = size();
+  setWorld(WORLDS[0], false);
   flyTo(p.view === "home" ? homeView(w, h) : { ...p.view });
   if (p.palette) state.palette = paletteById(p.palette);
   state.place = p.id;
@@ -271,6 +311,7 @@ canvas.addEventListener("pointermove", (e) => {
   if (e.pointerType !== "touch") atlas.setPointer({ x: e.offsetX, y: e.offsetY });
 });
 canvas.addEventListener("pointerleave", () => atlas.setPointer(null));
+atlas.setEnabled(state.world.formula === 0);
 
 let lastStatus: Status | null = null;
 const story = new Story({
@@ -289,7 +330,10 @@ const story = new Story({
   context: () => ({ reference: lastStatus?.reference ?? "none", width: state.current.width }),
   changed: (index) => {
     urlAt = 0;
-    if (index !== null) dive.stop();
+    if (index !== null) {
+      dive.stop();
+      setWorld(WORLDS[0], false);
+    }
   },
 });
 /** Cruising speed of the endless dive, in factors of e per second: slow enough to watch. */
@@ -307,7 +351,10 @@ const dive = new AutoDive({
   status: (text) => ($("dive-status").textContent = text),
   changed: (active) => {
     $("dive-toggle").setAttribute("aria-pressed", String(active));
-    if (active) story.close();
+    if (active) {
+      story.close();
+      setWorld(WORLDS[0], false);
+    }
   },
 });
 $("dive-toggle").addEventListener("click", () => dive.toggle());
@@ -348,6 +395,8 @@ async function recordView(): Promise<void> {
           maxIter: Math.max(autoIterations(view.width, state.detail), state.minIter),
           target,
           targetIter: Math.max(autoIterations(target.width, state.detail), state.minIter),
+          formula: state.world.formula,
+          power: state.world.power,
           palette: state.palette,
           period: state.palette.period / state.density,
           offset: state.offset,
@@ -401,6 +450,7 @@ function shareHash(): string {
     density: state.density,
     offset: state.offset,
     detail: state.detail,
+    world: state.world.id,
   });
 }
 
@@ -420,7 +470,8 @@ window.addEventListener("hashchange", () => {
     return;
   }
   story.close();
-  const s = decode(location.hash, { view: state.target, palette: state.palette.id, density: state.density, offset: state.offset, detail: state.detail });
+  const s = decode(location.hash, { view: state.target, palette: state.palette.id, density: state.density, offset: state.offset, detail: state.detail, world: state.world.id });
+  setWorld(worldById(s.world), false);
   flyTo(s.view);
   state.palette = paletteById(s.palette);
   state.density = s.density;
@@ -649,6 +700,8 @@ function frame(now: number): void {
     $("offset-out").textContent = state.offset.toFixed(2);
   }
 
+  // The other worlds are drawn in floats: they stop where floats do.
+  if (state.target.width < state.world.minWidth) state.target = { ...state.target, width: state.world.minWidth };
   const maxIter = Math.max(autoIterations(state.current.width, state.detail), state.minIter);
   const allowSamples = state.smooth && !state.cycling;
   const status = renderer.render({
@@ -656,6 +709,8 @@ function frame(now: number): void {
     maxIter,
     target: state.target,
     targetIter: Math.max(autoIterations(state.target.width, state.detail), state.minIter),
+    formula: state.world.formula,
+    power: state.world.power,
     palette: state.palette,
     period: state.palette.period / state.density,
     offset: state.offset,

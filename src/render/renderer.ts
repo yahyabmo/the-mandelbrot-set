@@ -32,6 +32,9 @@ export interface Frame {
   /** Where the motion is heading, so that a deep reference can be prepared before arrival. */
   target: View;
   targetIter: number;
+  /** The rule: 0 for the Mandelbrot set, others are drawn directly (see worlds.ts). */
+  formula?: number;
+  power?: number;
   palette: Palette;
   period: number;
   offset: number;
@@ -241,11 +244,11 @@ export class Renderer {
 
   render(f: Frame): Status {
     const gl = this.gl;
-    const perturb = f.view.width < DIRECT_LIMIT;
+    const perturb = (f.formula ?? 0) === 0 && f.view.width < DIRECT_LIMIT;
     this.uploadPalette(f.palette);
     this.bla = null;
     let reference: Status["reference"] = "none";
-    if (perturb || f.target.width < DIRECT_LIMIT) {
+    if (perturb || ((f.formula ?? 0) === 0 && f.target.width < DIRECT_LIMIT)) {
       const ref = this.refs.get(f.view, f.maxIter, f.target, f.targetIter, this.width, this.height);
       if (perturb && !ref) {
         // No orbit precise enough yet: keep the last image up until it comes.
@@ -267,7 +270,7 @@ export class Renderer {
       }
     }
 
-    const viewKey = [f.view.cx, f.view.cy, f.view.width, f.maxIter, this.width, this.height].join();
+    const viewKey = [f.view.cx, f.view.cy, f.view.width, f.maxIter, this.width, this.height, f.formula ?? 0].join();
     const colourKey = [f.palette.id, f.period, f.offset, f.interior.join()].join();
     if (viewKey !== this.viewKey) {
       this.viewKey = viewKey;
@@ -419,6 +422,8 @@ export class Renderer {
     gl.uniform2f(pr.u.uJitter, jitter[0], jitter[1]);
     gl.uniform1i(pr.u.uMaxIter, Math.min(maxIter, 2 ** 31 - 1));
     gl.uniform1i(pr.u.uPerturb, perturb ? 1 : 0);
+    gl.uniform1i(pr.u.uFormula, f.formula ?? 0);
+    gl.uniform1f(pr.u.uPower, f.power ?? 2);
     const [pm, pe] = splitPixel(pixel);
     gl.uniform1i(pr.u.uScaled, pixel < SCALED_BELOW ? 1 : 0);
     gl.uniform1f(pr.u.uPixelM, pm);

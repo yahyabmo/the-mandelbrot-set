@@ -8,6 +8,8 @@ export interface Shared {
   density: number;
   offset: number;
   detail: number;
+  /** The world, when it is not the Mandelbrot set. */
+  world?: string;
 }
 
 const num = (s: string | null, fallback: number) => {
@@ -39,6 +41,7 @@ export function encode(s: Shared): string {
     off: s.offset.toFixed(3),
     det: s.detail.toFixed(3),
   });
+  if (s.world && s.world !== "mandelbrot") q.set("f", s.world);
   return `#${q.toString()}`;
 }
 
@@ -55,5 +58,6 @@ export function decode(hash: string, defaults: Shared): Shared {
     density: num(q.get("den"), defaults.density),
     offset: num(q.get("off"), defaults.offset),
     detail: num(q.get("det"), defaults.detail),
+    world: q.get("f") ?? "mandelbrot",
   };
 }

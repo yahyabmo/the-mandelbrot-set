@@ -62,6 +62,8 @@ export class Atlas {
   private picks = 0;
   /** Set while something else, such as the sound, needs the readings with every layer off. */
   alwaysRead = false;
+  /** The atlas speaks of the Mandelbrot set only: off in the other worlds. */
+  private enabled = true;
   /** On a screen without hover, the cross at the centre is the pointer. */
   private touch = matchMedia("(hover: none)").matches;
 
@@ -111,7 +113,7 @@ export class Atlas {
 
   private sync(): void {
     for (const layer of Object.keys(this.layers) as Layer[]) $(`layer-${layer}`).setAttribute("aria-pressed", String(this.layers[layer]));
-    $("lens").hidden = !this.layers.lens;
+    $("lens").hidden = !this.layers.lens || !this.enabled;
     $("lavaurs").hidden = !this.layers.rays;
     $("pi-card").hidden = !this.layers.pi;
     if (this.layers.rays) {
@@ -142,8 +144,18 @@ export class Atlas {
     } else this.addPiRow(r.row);
   }
 
+  setEnabled(on: boolean): void {
+    if (on === this.enabled) return;
+    this.enabled = on;
+    $("lens").hidden = !on || !this.layers.lens;
+    if (!on) this.overlay.draw({ cx: 0, cy: 0, width: 1, wPx: 1, hPx: 1, orbit: null, component: null, rays: [], pi: false });
+    this.sceneKey = "";
+    this.readKey = "";
+  }
+
   /** Call once per frame, after the image is drawn. */
   frame(): void {
+    if (!this.enabled) return;
     const v = this.host.view();
     const [w, h] = this.host.size();
     const shallow = v.width >= ATLAS_DEPTH;
