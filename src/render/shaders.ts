@@ -281,7 +281,40 @@ uniform sampler2D uCounts;
 uniform vec2 uCountsSize;
 uniform sampler2D uAccum;    // colour sums, with the number of samples in alpha
 uniform float uSamples;      // 0: show the counts
+uniform int uRelief;         // 1: light the counts as a relief
 out vec4 outColour;
+
+/** Height of the relief at a texel of the counts: the smooth count itself; -1 inside the set. */
+float heightAt(ivec2 i) {
+  float v = texelFetch(uCounts, clamp(i, ivec2(0), ivec2(uCountsSize) - 1), 0).r;
+  return v < 0.0 ? -1.0 : v;
+}
+
+/**
+ * Light of the relief: the counts read as a height map, its slope from the neighbours,
+ * lit from the upper left. Steeper slopes near the set catch the light or fall in shade.
+ */
+float relief(vec2 uv) {
+  ivec2 i = ivec2(floor(uv * uCountsSize));
+  float h = heightAt(i);
+  if (h < 0.0) return 1.0;
+  float l = heightAt(i - ivec2(1, 0));
+  float r = heightAt(i + ivec2(1, 0));
+  float d = heightAt(i - ivec2(0, 1));
+  float u = heightAt(i + ivec2(0, 1));
+  // A neighbour inside the set stands as high as the highest of the others: a cliff.
+  float top = max(max(l, r), max(d, u)) + 1.0;
+  l = l < 0.0 ? top : l;
+  r = r < 0.0 ? top : r;
+  d = d < 0.0 ? top : d;
+  u = u < 0.0 ? top : u;
+  float k = 0.6 * uScreen.x / uCountsSize.x;
+  vec3 n = normalize(vec3((l - r) * k, (d - u) * k, 1.0));
+  vec3 light = normalize(vec3(-0.55, 0.62, 0.56));
+  float diffuse = max(dot(n, light), 0.0);
+  float shine = pow(max(dot(reflect(-light, n), vec3(0.0, 0.0, 1.0)), 0.0), 24.0);
+  return 0.38 + 0.9 * diffuse + 0.35 * shine;
+}
 
 
 vec3 countsColour(vec2 uv) {
@@ -302,5 +335,6 @@ void main() {
   // Each pixel divides by its own count: a sample computed in bands is only partly there.
   vec4 a = texture(uAccum, uv);
   vec3 c = uSamples > 0.0 ? a.rgb / max(a.a, 1.0) : countsColour(uv);
+  if (uRelief == 1) c *= relief(uv);
   outColour = vec4(toSrgb(clamp(c, 0.0, 1.0)), 1.0);
 }`;

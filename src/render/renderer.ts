@@ -43,6 +43,8 @@ export interface Frame {
   moving: boolean;
   /** Supersampling is pointless while the colours keep changing. */
   allowSamples: boolean;
+  /** Light the image as a relief. */
+  relief?: boolean;
 }
 
 export interface Status {
@@ -394,6 +396,7 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.accum!.tex);
     gl.uniform1i(pr.u.uAccum, 3);
     gl.uniform1f(pr.u.uSamples, samples);
+    gl.uniform1i(pr.u.uRelief, f.relief ? 1 : 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 

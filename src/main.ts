@@ -58,6 +58,7 @@ const state = {
   /** Iterations a view needs at least, beyond the automatic count: set by the endless dive. */
   minIter: 0,
   smooth: true,
+  relief: false,
   // A page opened without a link starts on the first place, the whole set.
   place: (initial === defaults ? "home" : null) as string | null,
   captureSince: 0,
@@ -202,6 +203,10 @@ cycle.addEventListener("click", () => {
   state.cycling = !state.cycling;
   syncPanel();
 });
+$("relief").addEventListener("click", () => {
+  state.relief = !state.relief;
+  syncPanel();
+});
 smooth.addEventListener("click", () => {
   state.smooth = !state.smooth;
   syncPanel();
@@ -239,6 +244,7 @@ function syncPanel(): void {
   $("detail-out").textContent = `${state.detail.toFixed(2)}×`;
   cycle.setAttribute("aria-pressed", String(state.cycling));
   smooth.setAttribute("aria-pressed", String(state.smooth));
+  $("relief").setAttribute("aria-pressed", String(state.relief));
 }
 
 /** Waypoints left on the way to a place, after the current target. */
@@ -616,6 +622,11 @@ window.addEventListener("keydown", (e) => {
     case "M":
       toggleSound();
       return;
+    case "l":
+    case "L":
+      state.relief = !state.relief;
+      syncPanel();
+      return;
     case "c":
     case "C":
       state.cycling = !state.cycling;
@@ -739,6 +750,7 @@ function frame(now: number): void {
     interior: INTERIOR,
     moving,
     allowSamples,
+    relief: state.relief,
   });
   renderer.adapt(Math.min(100, elapsed));
   atlas.frame();
