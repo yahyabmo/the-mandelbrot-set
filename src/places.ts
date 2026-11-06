@@ -59,6 +59,6 @@ export const PLACES: Place[] = [
     name: "The bottom of the map",
     blurb: "The dendrite at c = i again, 10²⁹⁰ times closer",
     view: viewOf("0", "1", 1e-290),
-    palette: "glacier",
+    palette: "classic",
   },
 ];
