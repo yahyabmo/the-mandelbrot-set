@@ -34,7 +34,14 @@
     <aside class="plate panel" id="panel" aria-label="Controls">
       <section>
         <h2><span>I</span> Places</h2>
-        <ol class="places" id="places"></ol>
+        <div class="picker" id="place-picker">
+          <button type="button" class="picker-button" id="place-button" aria-haspopup="listbox" aria-expanded="false" aria-controls="place-list">
+            <kbd id="place-key">1</kbd>
+            <span class="picker-text"><b id="place-name"></b><span id="place-blurb"></span></span>
+            <i class="picker-chevron" aria-hidden="true"></i>
+          </button>
+          <ol class="picker-list" id="place-list" role="listbox" tabindex="-1" aria-label="Places" hidden></ol>
+        </div>
       </section>
       <section>
         <h2><span>II</span> Colours</h2>

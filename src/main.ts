@@ -47,7 +47,8 @@ const state = {
   cycling: false,
   cycleSpeed: 0.12,
   smooth: true,
-  place: null as string | null,
+  // A page opened without a link starts on the first place, the whole set.
+  place: (initial === defaults ? "home" : null) as string | null,
   captureSince: 0,
 };
 
@@ -55,18 +56,87 @@ const state = {
 // Panel
 // ---------------------------------------------------------------------------
 
-const placeButtons = PLACES.map((p, i) => {
-  const item = document.createElement("li");
-  const b = document.createElement("button");
-  b.type = "button";
-  b.className = "place";
-  b.innerHTML = `<kbd>${i + 1}</kbd><b></b><span></span>`;
-  b.querySelector("b")!.textContent = p.name;
-  b.querySelector("span")!.textContent = p.blurb;
-  b.addEventListener("click", () => goTo(p));
-  item.append(b);
-  $("places").append(item);
-  return b;
+// Places: a drop-down list in the panel. The keys 1 to 8 reach them too.
+const placeButton = $("place-button");
+const placeList = $("place-list");
+const placeOptions = PLACES.map((p, i) => {
+  const option = document.createElement("li");
+  option.id = `place-${p.id}`;
+  option.className = "picker-option";
+  option.setAttribute("role", "option");
+  option.innerHTML = `<kbd>${i + 1}</kbd><b></b><span></span>`;
+  option.querySelector("b")!.textContent = p.name;
+  option.querySelector("span")!.textContent = p.blurb;
+  option.addEventListener("click", () => {
+    closePlaces(true);
+    goTo(p);
+  });
+  option.addEventListener("pointermove", () => highlight(i, false));
+  placeList.append(option);
+  return option;
+});
+let highlighted = 0;
+
+function highlight(i: number, scroll = true): void {
+  highlighted = (i + PLACES.length) % PLACES.length;
+  placeOptions.forEach((o, k) => o.classList.toggle("highlighted", k === highlighted));
+  placeList.setAttribute("aria-activedescendant", placeOptions[highlighted].id);
+  if (scroll) placeOptions[highlighted].scrollIntoView({ block: "nearest" });
+}
+
+function openPlaces(): void {
+  placeList.hidden = false;
+  placeButton.setAttribute("aria-expanded", "true");
+  highlight(Math.max(0, PLACES.findIndex((p) => p.id === state.place)));
+  placeList.focus();
+}
+
+function closePlaces(refocus: boolean): void {
+  if (placeList.hidden) return;
+  placeList.hidden = true;
+  placeButton.setAttribute("aria-expanded", "false");
+  if (refocus) placeButton.focus();
+}
+
+placeButton.addEventListener("click", () => (placeList.hidden ? openPlaces() : closePlaces(true)));
+placeButton.addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  e.preventDefault();
+  openPlaces();
+});
+placeList.addEventListener("keydown", (e) => {
+  switch (e.key) {
+    case "ArrowDown":
+      highlight(highlighted + 1);
+      break;
+    case "ArrowUp":
+      highlight(highlighted - 1);
+      break;
+    case "Home":
+      highlight(0);
+      break;
+    case "End":
+      highlight(PLACES.length - 1);
+      break;
+    case "Enter":
+    case " ":
+      closePlaces(true);
+      goTo(PLACES[highlighted]);
+      break;
+    case "Escape":
+      closePlaces(true);
+      break;
+    case "Tab":
+      closePlaces(false);
+      return;
+    default:
+      return;
+  }
+  e.preventDefault();
+  e.stopPropagation();
+});
+document.addEventListener("pointerdown", (e) => {
+  if (!$("place-picker").contains(e.target as Node)) closePlaces(false);
 });
 
 // The depth gauge: one tick per decade of magnification, down to the deepest this version reaches.
@@ -128,7 +198,14 @@ if (innerWidth <= 720) {
 }
 
 function syncPanel(): void {
-  placeButtons.forEach((b, i) => b.classList.toggle("active", PLACES[i].id === state.place));
+  const place = PLACES.findIndex((p) => p.id === state.place);
+  $("place-key").textContent = place >= 0 ? String(place + 1) : "–";
+  $("place-name").textContent = place >= 0 ? PLACES[place].name : "Off the map";
+  $("place-blurb").textContent = place >= 0 ? PLACES[place].blurb : "Pick a place to fly there";
+  placeOptions.forEach((o, i) => {
+    o.classList.toggle("active", i === place);
+    o.setAttribute("aria-selected", String(i === place));
+  });
   paletteButtons.forEach((b, i) => b.classList.toggle("active", PALETTES[i].id === state.palette.id));
   density.value = String(Math.log10(state.density));
   offset.value = String(state.offset);
@@ -144,6 +221,7 @@ function goTo(p: Place): void {
   state.target = p.view === "home" ? homeView(w, h) : { ...p.view };
   if (p.palette) state.palette = paletteById(p.palette);
   state.place = p.id;
+  closePlaces(false);
   inertia = { x: 0, y: 0 };
   syncPanel();
 }

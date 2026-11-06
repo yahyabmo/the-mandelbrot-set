@@ -246,56 +246,133 @@ body.panel-closed .panel {
   color: var(--accent);
 }
 
-.places {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border-top: 1px solid var(--rule);
+/* The drop-down list of places. */
+.picker {
+  position: relative;
 }
-.place {
+.picker-button {
   display: grid;
-  grid-template-columns: 26px 1fr;
-  gap: 1px 0;
+  grid-template-columns: 26px minmax(0, 1fr) 16px;
+  align-items: center;
   width: 100%;
-  padding: 7px 0 8px;
-  border: 0;
-  border-bottom: 1px solid var(--rule);
-  background: transparent;
+  padding: 10px 12px 11px 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 0;
+  background: rgba(246, 243, 234, 0.05);
   color: var(--ink);
   font: inherit;
   text-align: left;
   text-shadow: inherit;
   cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
-.place kbd {
-  grid-row: span 2;
-  align-self: start;
-  margin-top: 2px;
+.picker-button:hover {
+  border-color: var(--ink-soft);
+  background: rgba(246, 243, 234, 0.09);
+}
+.picker-button[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.picker-button > kbd {
   justify-self: start;
 }
-.place b {
+.picker-text {
+  display: grid;
+  gap: 1px;
+}
+.picker-text b {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+.picker-text span {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.picker-chevron {
+  justify-self: end;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid var(--ink-soft);
+  border-bottom: 1px solid var(--ink-soft);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.2s ease;
+}
+.picker-button[aria-expanded="true"] .picker-chevron {
+  border-color: var(--accent);
+  transform: translateY(2px) rotate(225deg);
+}
+.picker-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: min(62vh, 470px);
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: rgba(11, 12, 17, 0.97);
+  border: 1px solid var(--edge);
+  box-shadow: 0 22px 44px -18px rgba(0, 0, 0, 0.75);
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+  animation: picker-in 0.16s ease-out;
+}
+.picker-list:focus {
+  outline: none;
+}
+.picker-option {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 1px 0;
+  padding: 7px 12px 8px 8px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+}
+.picker-option + .picker-option {
+  border-top: 1px solid var(--rule);
+}
+.picker-option kbd {
+  grid-row: span 2;
+  align-self: start;
+  justify-self: start;
+  margin-top: 2px;
+}
+.picker-option b {
   font-family: var(--display);
   font-size: 15px;
   font-weight: 400;
 }
-.place span {
+.picker-option span {
   font-size: 11.5px;
   color: var(--ink-soft);
 }
-.place:hover b {
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-decoration-color: var(--rule-strong);
-  text-underline-offset: 3px;
+.picker-option.highlighted {
+  background: rgba(246, 243, 234, 0.08);
+  border-left-color: var(--ink-soft);
 }
-.place.active b {
+.picker-option.active b {
   color: var(--accent);
 }
-.place.active kbd {
+.picker-option.active kbd,
+.picker-button > kbd {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--on-accent);
   text-shadow: none;
+}
+@keyframes picker-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 .palettes {
@@ -619,7 +696,12 @@ kbd {
   .toast,
   .gauge-mark,
   .toggle,
-  .action {
+  .action,
+  .picker-button,
+  .picker-chevron {
     transition: none;
+  }
+  .picker-list {
+    animation: none;
   }
 }
