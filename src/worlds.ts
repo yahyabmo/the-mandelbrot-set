@@ -29,6 +29,8 @@ export const WORLDS: World[] = [
   { id: "ship", name: "Burning Ship", rule: "(|x| + i|y|)² + c", formula: 1, power: 2, home: viewOf("-0.45", "0.5", 4.2), height: 2.8, minWidth: 4e-5, highlight: { name: "the ship", view: viewOf("-1.757", "0.031", 0.15), palette: "ember" } },
   { id: "tricorn", name: "Tricorn", rule: "z̄² + c", formula: 2, power: 2, home: viewOf("-0.2", "0", 4.2), height: 3.6, minWidth: 4e-5 },
   { id: "cubic", name: "Multibrot 3", rule: "z³ + c", formula: 3, power: 3, home: viewOf("0", "0", 3.4), height: 2.9, minWidth: 4e-5 },
+  // Not a rule for each c but a picture of where the orbits go: see buddha/sampler.ts.
+  { id: "buddha", name: "Buddhabrot", rule: "orbits that escape", formula: 5, power: 2, home: viewOf("-0.4", "0", 3.4), height: 2.9, minWidth: 0.01 },
   { id: "quartic", name: "Multibrot 4", rule: "z⁴ + c", formula: 4, power: 4, home: viewOf("-0.1", "0", 3.2), height: 2.8, minWidth: 4e-5 },
 ];
 

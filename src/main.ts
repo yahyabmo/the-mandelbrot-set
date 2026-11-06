@@ -6,6 +6,7 @@ import { toDecimal, toNumber } from "./math/fixed";
 import { ease, flightPath, HOME_WIDTH, homeView, inSight, MIN_WIDTH, panBy, settled, zoomAt, zoomRate, type View } from "./math/view";
 import { PLACES, type Place } from "./places";
 import { WORLDS, worldById, worldHome, type World } from "./worlds";
+import { Buddhabrot } from "./buddha/view";
 import { Renderer, type Status } from "./render/renderer";
 import { Story } from "./story/story";
 import { AutoDive } from "./dive/autodive";
@@ -314,6 +315,8 @@ canvas.addEventListener("pointerleave", () => atlas.setPointer(null));
 atlas.setEnabled(state.world.formula === 0);
 
 let lastStatus: Status | null = null;
+/** The Buddhabrot, made when its world is first entered. */
+let buddha: Buddhabrot | null = null;
 const story = new Story({
   atlas,
   flyTo: (v) => {
@@ -702,6 +705,25 @@ function frame(now: number): void {
 
   // The other worlds are drawn in floats: they stop where floats do.
   if (state.target.width < state.world.minWidth) state.target = { ...state.target, width: state.world.minWidth };
+  if (state.world.id === "buddha") {
+    buddha ??= new Buddhabrot(renderer.gl);
+    buddha.draw(state.current, canvas.width, canvas.height, moving, now);
+    lastStatus = { engine: "direct", sharp: !moving, samples: 1, scale: 1, reference: "none", skipping: false };
+    if (now - hudAt > 120) {
+      hudAt = now;
+      $("hud-zoom").innerHTML = magnificationHtml(homeView(...size()).width / state.current.width);
+      $("hud-engine").textContent = "buddhabrot";
+      $("hud-re").textContent = coordinateText(state.current.cx, state.current.width);
+      $("hud-im").textContent = coordinateText(state.current.cy, state.current.width);
+      $("hud-iter").textContent = "5,000 / 500 / 50";
+      $("hud-ref").textContent = "none";
+      $("hud-image").textContent = `${buddha.orbits.toLocaleString("en-US")} orbits`;
+      $("hud-fps").textContent = String(Math.round(fps));
+    }
+    requestAnimationFrame(frame);
+    return;
+  }
+  buddha?.stop();
   const maxIter = Math.max(autoIterations(state.current.width, state.detail), state.minIter);
   const allowSamples = state.smooth && !state.cycling;
   const status = renderer.render({
@@ -785,6 +807,9 @@ requestAnimationFrame(frame);
   story,
   atlas,
   dive,
+  get buddha() {
+    return buddha;
+  },
   sound,
   recordView,
   /** The current view in plain numbers, for scripts that cannot read bigints. */
