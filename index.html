@@ -13,6 +13,7 @@
   </head>
   <body>
     <canvas id="stage" aria-label="The Mandelbrot set. Scroll to zoom, drag to move."></canvas>
+    <canvas id="atlas-overlay" class="atlas-overlay" aria-hidden="true"></canvas>
     <div class="reticle" aria-hidden="true"></div>
 
     <header class="plate brand">
@@ -44,7 +45,36 @@
         </div>
       </section>
       <section>
-        <h2><span>II</span> Colours</h2>
+        <h2><span>II</span> Atlas</h2>
+        <div class="row">
+          <button type="button" class="toggle" id="layer-lens" aria-pressed="true">Lens</button>
+          <button type="button" class="toggle" id="layer-component" aria-pressed="true">Component</button>
+          <button type="button" class="toggle" id="layer-orbit" aria-pressed="false">Orbit</button>
+          <button type="button" class="toggle" id="layer-rays" aria-pressed="false">Rays</button>
+          <button type="button" class="toggle" id="layer-pi" aria-pressed="false">π</button>
+        </div>
+        <figure class="lavaurs" id="lavaurs" hidden>
+          <canvas id="lavaurs-canvas"></canvas>
+          <figcaption>Lavaurs' diagram. Each chord joins the two rays that land at the root of one component, up to period 6. Pick a chord to fly there.</figcaption>
+        </figure>
+        <div class="pi-card" id="pi-card" hidden>
+          <p>At c = −3/4 + iε, count the steps N before the orbit leaves the disc of radius 2. As ε shrinks, N·ε tends to π.</p>
+          <table id="pi-neck">
+            <thead><tr><th>ε</th><th>N</th><th>N·ε</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <p>At the cusp, c = 1/4 + ε, it is N·√ε that tends to π.</p>
+          <table id="pi-cusp">
+            <thead><tr><th>ε</th><th>N</th><th>N·√ε</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="row">
+            <button type="button" class="action" id="pi-fly">Fly to the neck</button>
+          </div>
+        </div>
+      </section>
+      <section>
+        <h2><span>III</span> Colours</h2>
         <div class="palettes" id="palettes"></div>
         <label class="slider">
           <span>Density <output id="density-out"></output></span>
@@ -60,7 +90,7 @@
         </div>
       </section>
       <section>
-        <h2><span>III</span> Detail</h2>
+        <h2><span>IV</span> Detail</h2>
         <label class="slider">
           <span>Iterations <output id="detail-out"></output></span>
           <input id="detail" type="range" min="-2" max="2" step="0.01" value="0" />
@@ -70,7 +100,7 @@
         </div>
       </section>
       <section>
-        <h2><span>IV</span> Keep</h2>
+        <h2><span>V</span> Keep</h2>
         <div class="row">
           <button type="button" class="action" id="copy-link">Copy link</button>
           <button type="button" class="action" id="save-image">Save image</button>
@@ -93,6 +123,19 @@
       </dl>
       <p class="limit" id="hud-limit" hidden>Deepest zoom of this version.</p>
     </div>
+
+    <figure class="plate lens" id="lens">
+      <figcaption class="lens-label">Julia set and orbit</figcaption>
+      <div class="lens-view">
+        <canvas id="lens-julia" aria-label="The Julia set of the point under the pointer"></canvas>
+        <canvas id="lens-orbit" aria-hidden="true"></canvas>
+      </div>
+      <dl class="lens-facts">
+        <dt>c</dt><dd id="lens-c"></dd>
+        <dt>orbit</dt><dd id="lens-fate"></dd>
+        <dt>component</dt><dd id="lens-component"></dd>
+      </dl>
+    </figure>
 
     <div class="plate scalebar" aria-hidden="true">
       <div class="scalebar-rule"></div>

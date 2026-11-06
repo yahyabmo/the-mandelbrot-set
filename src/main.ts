@@ -1,4 +1,5 @@
 import "./style.css";
+import { Atlas } from "./atlas/controller";
 import { paletteById, paletteCss, PALETTES, type Rgb } from "./color/palettes";
 import { autoIterations } from "./math/iterations";
 import { toDecimal, toNumber } from "./math/fixed";
@@ -247,6 +248,23 @@ function goTo(p: Place): void {
   inertia = { x: 0, y: 0 };
   syncPanel();
 }
+
+// The atlas reads the point under the mouse; on a touch screen, the centre of the view.
+const atlas = new Atlas({
+  view: () => state.current,
+  size,
+  colours: () => ({ palette: state.palette, period: state.palette.period / state.density, offset: state.offset, interior: INTERIOR }),
+  flyTo: (v) => {
+    flyTo(v);
+    state.place = null;
+    inertia = { x: 0, y: 0 };
+    syncPanel();
+  },
+});
+canvas.addEventListener("pointermove", (e) => {
+  if (e.pointerType !== "touch") atlas.setPointer({ x: e.offsetX, y: e.offsetY });
+});
+canvas.addEventListener("pointerleave", () => atlas.setPointer(null));
 
 let toastTimer = 0;
 function toast(text: string): void {
@@ -500,6 +518,7 @@ function frame(now: number): void {
     allowSamples,
   });
   renderer.adapt(Math.min(100, elapsed));
+  atlas.frame();
 
   if (state.captureSince) {
     const ready = status.sharp && (!allowSamples || status.samples >= CAPTURE_SAMPLES);

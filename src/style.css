@@ -566,9 +566,8 @@ kbd {
 
 /* ---------- scale bar ---------- */
 .scalebar {
-  left: 50%;
+  left: calc(var(--gap) * 2 + 272px);
   bottom: var(--gap);
-  transform: translateX(-50%);
   padding: 8px 12px 7px;
   display: grid;
   justify-items: center;
@@ -604,6 +603,110 @@ kbd {
 }
 .hint.gone {
   opacity: 0;
+}
+
+/* ---------- atlas ---------- */
+.atlas-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+body.ui-hidden .atlas-overlay {
+  opacity: 0;
+}
+.lens {
+  right: calc(var(--panel-w) + var(--gap) * 2);
+  bottom: var(--gap);
+  width: 232px;
+  margin: 0;
+  padding: 10px 12px 12px;
+  transition: right 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s ease;
+}
+body.panel-closed .lens {
+  right: var(--gap);
+}
+.lens-label {
+  margin-bottom: 8px;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink-soft);
+}
+.lens-view {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--edge);
+  background: var(--night);
+}
+.lens-view canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.lens-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 9px 0 0;
+  font-size: 11px;
+}
+.lens-facts dt {
+  color: var(--ink-faint);
+}
+.lens-facts dd {
+  margin: 0;
+  font-family: var(--mono);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.lavaurs {
+  margin: 2px 0 0;
+}
+.lavaurs canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+}
+.lavaurs figcaption,
+.pi-card p {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+.pi-card {
+  display: grid;
+  gap: 6px;
+}
+.pi-card table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.pi-card th {
+  padding: 0 0 3px;
+  border-bottom: 1px solid var(--rule);
+  font-weight: 500;
+  color: var(--ink-faint);
+  text-align: right;
+}
+.pi-card td {
+  padding: 2px 0;
+  text-align: right;
+  color: var(--ink-soft);
+}
+.pi-card td b {
+  font-weight: 500;
+  color: var(--accent);
 }
 
 /* A hairline cross at the centre, drawn in difference so that it shows on any colour. */
@@ -661,7 +764,8 @@ kbd {
   .brand-sub,
   .hint,
   .gauge,
-  .scalebar {
+  .scalebar,
+  .lens {
     display: none;
   }
   .brand {
@@ -701,6 +805,7 @@ kbd {
   .plate,
   .toast,
   .gauge-mark,
+  .lens,
   .toggle,
   .action,
   .picker-button,

@@ -10,7 +10,7 @@ void main() {
   gl_Position = vec4(p, 0.0, 1.0);
 }`;
 
-const HEADER = `#version 300 es
+export const HEADER = `#version 300 es
 precision highp float;
 precision highp int;
 precision highp sampler2D;
@@ -193,7 +193,7 @@ float iterate() {
 }
 `;
 
-const COLOUR = `
+export const COLOUR = `
 uniform sampler2D uPalette; // sRGB texels, read back as linear light
 uniform float uPeriod;
 uniform float uOffset;
@@ -225,8 +225,16 @@ uniform sampler2D uCounts;
 out vec4 outColour;
 void main() { outColour = vec4(colourOf(texelFetch(uCounts, ivec2(gl_FragCoord.xy), 0).r), 1.0); }`;
 
+export const SRGB = `
+vec3 toSrgb(vec3 c) {
+  vec3 lo = c * 12.92;
+  vec3 hi = 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055;
+  return mix(hi, lo, vec3(lessThanEqual(c, vec3(0.0031308))));
+}
+`;
+
 /** Puts the image on screen: either a count texture coloured on the fly, or the accumulated average. */
-export const DISPLAY = `${HEADER}${COLOUR}
+export const DISPLAY = `${HEADER}${COLOUR}${SRGB}
 uniform vec2 uScreen;
 uniform sampler2D uCounts;
 uniform vec2 uCountsSize;
@@ -234,11 +242,6 @@ uniform sampler2D uAccum;    // colour sums, with the number of samples in alpha
 uniform float uSamples;      // 0: show the counts
 out vec4 outColour;
 
-vec3 toSrgb(vec3 c) {
-  vec3 lo = c * 12.92;
-  vec3 hi = 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055;
-  return mix(hi, lo, vec3(lessThanEqual(c, vec3(0.0031308))));
-}
 
 vec3 countsColour(vec2 uv) {
   // Bilinear blend of the colours, not of the counts: a lower-resolution image stays smooth.
