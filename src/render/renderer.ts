@@ -15,6 +15,12 @@ const MAX_SAMPLES = 12;
 const BUDGET_SHARE = 0.7;
 /** No screen refreshes faster than this; shorter frames are timing glitches. */
 const MIN_REFRESH_MS = 4;
+/**
+ * Without a table of approximations, every iteration is a step: past this many the frame
+ * would stall the GPU. Such frames wait for the table, as for the orbit; the image in
+ * motion starts at this many iterations too, and earns more while frames keep on time.
+ */
+const SAFE_ITER = 100_000;
 /** Lowest resolution of the image in motion: blurred, but never a slide show. */
 const MIN_MOTION_SCALE = 0.08;
 /** A frame this much longer than a refresh was held back by the GPU, not by the screen. */
@@ -93,6 +99,7 @@ export class Renderer {
   private blaUploaded: BlaTable | null = null;
   private bla: BlaTable | null = null;
   private blaOffsets = new Int32Array(24);
+  private periodic = false;
   private refCx: Fixed = 0n;
   private refCy: Fixed = 0n;
   private shown: { counts: Target; samples: number } | null = null;
@@ -113,6 +120,19 @@ export class Renderer {
   private lastRefined = false;
   /** Frames to wait after a slow one before trying more again. */
   private hold = 0;
+  /** Iterations allowed to the image in motion; lowered when even the smallest preview is late. */
+  private motionIter = SAFE_ITER;
+  private lastMotion = false;
+  private lastMaxIter = 0;
+  /**
+   * Rows drawn at least per refining frame. When a single row is already late, the time is
+   * set by the longest chain of steps of one pixel, not by the number of pixels: more rows
+   * then cost nothing more, and this doubles while the frame time holds.
+   */
+  private minRows = 1;
+  private lastSlowMs = 0;
+  /** True when the last refining frame drew only the floor of rows: its time was not the cost model's doing. */
+  private atFloor = false;
   private motionScale = 0.6;
   /** Interval between screen refreshes, read from the shortest frames: 8.3 ms at 120 Hz. */
   private refreshMs = 16.7;
@@ -187,6 +207,21 @@ export class Renderer {
     else this.cost[e] = Math.min(this.cost[e], bound / this.lastWork);
     if (frameMs > bound) this.hold = HOLD_FRAMES;
     else if (this.hold > 0) this.hold--;
+    if (this.lastMotion) {
+      // Too slow even at the lowest resolution: fewer iterations while moving.
+      if (frameMs > bound && this.motionScale <= MIN_MOTION_SCALE * 1.01) this.motionIter = Math.max(500, Math.min(this.lastMaxIter, this.motionIter) * 0.6);
+      else if (frameMs < this.refreshMs * 1.15 && this.motionIter < this.lastMaxIter) {
+        this.motionIter *= 1.2;
+        if (this.motionIter >= this.lastMaxIter) this.motionIter = Math.max(SAFE_ITER, this.lastMaxIter);
+      }
+    } else if (this.lastRefined && this.atFloor && frameMs > 2 * bound) {
+      // Late although it drew the fewest rows: bound by the longest pixel, so draw more at once.
+      this.minRows = frameMs < 1.3 * this.lastSlowMs || this.lastSlowMs === 0 ? Math.min(this.height, this.minRows * 2) : Math.max(1, this.minRows >> 1);
+      this.lastSlowMs = frameMs;
+    } else if (this.lastRefined) {
+      this.minRows = Math.max(1, this.minRows >> 1);
+      this.lastSlowMs = 0;
+    }
   }
 
   private get budgetMs(): number {
@@ -196,7 +231,9 @@ export class Renderer {
   /** Rows of the full image that fit in the budget, for this engine and iteration limit. */
   private rowsInBudget(maxIter: number): number {
     const c = this.cost[this.lastEngine];
-    return Math.max(1, Math.floor(this.budgetMs / (c * this.width * maxIter)));
+    const rows = Math.floor(this.budgetMs / (c * this.width * maxIter));
+    this.atFloor = rows <= this.minRows;
+    return Math.max(this.minRows, rows);
   }
 
   render(f: Frame): Status {
@@ -214,8 +251,14 @@ export class Renderer {
         return { engine: "perturbation", sharp: false, samples: 0, scale: this.motionScale, reference: "waiting", skipping: false };
       }
       if (perturb && ref) {
-        this.uploadOrbit(ref);
         this.bla = this.refs.table(ref, f.view, f.target, this.width, this.height);
+        if (!this.bla && ref.bits > 0 && f.maxIter > SAFE_ITER) {
+          // The table for this view is on its way: keep the last image until it comes.
+          if (this.shown) this.display(f, this.shown.counts, this.shown.samples);
+          this.lastWork = 0;
+          return { engine: "perturbation", sharp: false, samples: 0, scale: this.motionScale, reference: "waiting", skipping: false };
+        }
+        this.uploadOrbit(ref);
         if (this.bla) this.uploadBla(this.bla);
         reference = ref.bits === 0 ? "doubles" : ref.bits;
       }
@@ -239,6 +282,9 @@ export class Renderer {
     this.lastEngine = !perturb ? "direct" : this.bla ? "skipping" : "perturbation";
     this.lastWork = 0;
     this.lastRefined = !f.moving;
+    this.atFloor = false;
+    this.lastMotion = f.moving;
+    this.lastMaxIter = f.maxIter;
     const fullDone = this.fullRows >= this.height;
     if (f.moving || (!fullDone && !this.lowValid)) {
       // A quick, lower-resolution image: always complete, always on time.
@@ -247,9 +293,10 @@ export class Renderer {
       const w = Math.max(16, Math.round(this.width * this.motionScale));
       const h = Math.max(16, Math.round(this.height * this.motionScale));
       this.low = this.target(this.low, w, h, "count");
-      this.drawCounts(this.low, f, perturb, 0, h, [0, 0]);
+      const iter = Math.min(f.maxIter, this.motionIter);
+      this.drawCounts(this.low, f, perturb, 0, h, [0, 0], iter);
       this.lowValid = true;
-      this.lastWork += w * h * f.maxIter;
+      this.lastWork += w * h * iter;
     }
     if (!f.moving && !fullDone) {
       const rows = Math.min(this.rowsInBudget(f.maxIter), this.height - this.fullRows);
@@ -315,14 +362,14 @@ export class Renderer {
     }
   }
 
-  private drawCounts(t: Target, f: Frame, perturb: boolean, y0: number, rows: number, jitter: [number, number]): void {
+  private drawCounts(t: Target, f: Frame, perturb: boolean, y0: number, rows: number, jitter: [number, number], maxIter = f.maxIter): void {
     const gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
     gl.viewport(0, 0, t.w, t.h);
     gl.enable(gl.SCISSOR_TEST);
     gl.scissor(0, y0, t.w, rows);
     const pr = this.use("count", f);
-    this.setIteration(pr, f, perturb, t.w, t.h, jitter);
+    this.setIteration(pr, f, perturb, t.w, t.h, jitter, maxIter);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.disable(gl.SCISSOR_TEST);
   }
@@ -359,7 +406,7 @@ export class Renderer {
     return pr;
   }
 
-  private setIteration(pr: Program, f: Frame, perturb: boolean, w: number, h: number, jitter: [number, number]): void {
+  private setIteration(pr: Program, f: Frame, perturb: boolean, w: number, h: number, jitter: [number, number], maxIter = f.maxIter): void {
     const gl = this.gl;
     gl.uniform2f(pr.u.uSize, w, h);
     gl.uniform1f(pr.u.uPixel, f.view.width / w);
@@ -367,7 +414,7 @@ export class Renderer {
     gl.uniform2f(pr.u.uCenter, toNumber(f.view.cx), toNumber(f.view.cy));
     gl.uniform2f(pr.u.uRefPx, toNumber(f.view.cx - this.refCx) / pixel, toNumber(f.view.cy - this.refCy) / pixel);
     gl.uniform2f(pr.u.uJitter, jitter[0], jitter[1]);
-    gl.uniform1i(pr.u.uMaxIter, f.maxIter);
+    gl.uniform1i(pr.u.uMaxIter, Math.min(maxIter, 2 ** 31 - 1));
     gl.uniform1i(pr.u.uPerturb, perturb ? 1 : 0);
     const [pm, pe] = splitPixel(pixel);
     gl.uniform1i(pr.u.uScaled, pixel < SCALED_BELOW ? 1 : 0);
@@ -377,6 +424,7 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.orbit);
     gl.uniform1i(pr.u.uOrbit, 1);
     gl.uniform1i(pr.u.uOrbitLen, this.orbitLen);
+    gl.uniform1i(pr.u.uPeriodic, perturb && this.periodic ? 1 : 0);
     const t = perturb ? this.bla : null;
     gl.uniform1i(pr.u.uBla, t ? 1 : 0);
     if (t) {
@@ -412,6 +460,9 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.orbit);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, ORBIT_ROW, rows, 0, gl.RG, gl.FLOAT, data);
     this.orbitLen = ref.orbit.length;
+    // Stopped early without escaping: the orbit came back to 0, the reference is a nucleus.
+    const L = ref.orbit.length;
+    this.periodic = L < ref.maxIter && Math.hypot(ref.orbit.data[2 * L], ref.orbit.data[2 * L + 1]) < 1;
     this.refCx = ref.cx;
     this.refCy = ref.cy;
   }
