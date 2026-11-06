@@ -1,4 +1,4 @@
-import type { View } from "./math/view";
+import { viewOf, type View } from "./math/view";
 
 export interface Place {
   id: string;
@@ -14,43 +14,44 @@ export const PLACES: Place[] = [
     id: "seahorses",
     name: "Seahorse valley",
     blurb: "Between the cardioid and its big bulb",
-    view: { cx: -0.7453, cy: 0.1127, width: 0.012 },
+    view: viewOf("-0.7453", "0.1127", 0.012),
   },
   {
     id: "spiral",
     name: "Seahorse spiral",
     blurb: "A double spiral, 10⁵ times closer",
-    view: { cx: -0.743643887037151, cy: 0.13182590420533, width: 4e-5 },
+    view: viewOf("-0.743643887037151", "0.13182590420533", 4e-5),
   },
   {
     id: "elephants",
     name: "Elephant valley",
     blurb: "Trunks along the right-hand cusp",
-    view: { cx: 0.2826, cy: 0.0095, width: 0.024 },
+    view: viewOf("0.2826", "0.0095", 0.024),
   },
   {
     id: "minibrot",
     name: "A copy of itself",
     blurb: "The period-3 minibrot on the real axis",
-    view: { cx: -1.7548776662466927, cy: 0, width: 0.042 },
+    view: viewOf("-1.7548776662466927", "0", 0.042),
   },
   {
     id: "dendrite",
     name: "The dendrite at c = i",
     blurb: "A Misiurewicz point: branches without bulbs",
-    view: { cx: 0, cy: 1, width: 0.3 },
+    view: viewOf("0", "1", 0.3),
   },
   {
     id: "lightning",
     name: "Lightning",
     blurb: "Antennas around a bulb above the top one",
-    view: { cx: -0.1592, cy: 1.0317, width: 0.02 },
+    view: viewOf("-0.1592", "1.0317", 0.02),
   },
   {
     id: "dive-2023",
     name: "The 2023 dive",
     blurb: "The point of the original script, 10⁹ deep",
-    view: { cx: -1.787806383508555, cy: 0.0000568907551128815, width: 4e-9 },
+    // The centre of the 2023 script, to its 27 digits.
+    view: viewOf("-1.78780638350855487198076170", "0.00005689075511288150404139", 4e-9),
     palette: "turbo-2023",
   },
 ];

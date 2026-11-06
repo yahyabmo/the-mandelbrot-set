@@ -19,6 +19,7 @@ const ITERATE = `
 uniform vec2 uSize;       // target size in pixels
 uniform float uPixel;     // complex units per target pixel
 uniform vec2 uCenter;     // view centre, used by the direct path only
+uniform vec2 uRefPx;      // view centre minus the reference point, in pixels
 uniform vec2 uJitter;     // sub-pixel offset of this sample
 uniform int uMaxIter;
 uniform int uPerturb;     // 0: direct float32, 1: perturbation around the reference orbit
@@ -33,9 +34,9 @@ float smoothCount(int i, float r2) { return float(i) - log2(log2(r2)) + 4.0; }
 
 /** Continuous iteration count of the sample, or -1 inside the set. */
 float iterate() {
-  vec2 offset = (gl_FragCoord.xy + uJitter - 0.5 * uSize) * uPixel;
+  vec2 px = gl_FragCoord.xy + uJitter - 0.5 * uSize;
   if (uPerturb == 0) {
-    vec2 c = uCenter + offset;
+    vec2 c = uCenter + px * uPixel;
     vec2 z = vec2(0.0);
     for (int i = 0; i < uMaxIter; i++) {
       z = cmul(z, z) + c;
@@ -45,11 +46,12 @@ float iterate() {
     return -1.0;
   }
   // dz <- 2 Z dz + dz^2 + dc, z = Z + dz, rebasing to the start of the orbit when needed.
+  vec2 dc = (px + uRefPx) * uPixel;
   vec2 dz = vec2(0.0);
   int m = 0;
   for (int i = 0; i < uMaxIter; i++) {
     vec2 Z = orbitAt(m);
-    dz = 2.0 * cmul(Z, dz) + cmul(dz, dz) + offset;
+    dz = 2.0 * cmul(Z, dz) + cmul(dz, dz) + dc;
     m++;
     vec2 z = orbitAt(m) + dz;
     float r2 = dot(z, z);

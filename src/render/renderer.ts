@@ -1,4 +1,5 @@
 import { paletteTexels, type Palette, type Rgb } from "../color/palettes";
+import { fromNumber, toNumber, type Fixed } from "../math/fixed";
 import { referenceOrbit } from "../math/mandelbrot";
 import type { View } from "../math/view";
 import { COLOURIZE, COUNT, DISPLAY, SAMPLE, VERTEX } from "./shaders";
@@ -66,6 +67,8 @@ export class Renderer {
   private orbit: WebGLTexture;
   private orbitLen = 0;
   private orbitKey = "";
+  private refCx: Fixed = 0n;
+  private refCy: Fixed = 0n;
   private low: Target | null = null;
   private full: Target | null = null;
   private accum: Target | null = null;
@@ -285,7 +288,9 @@ export class Renderer {
     const gl = this.gl;
     gl.uniform2f(pr.u.uSize, w, h);
     gl.uniform1f(pr.u.uPixel, f.view.width / w);
-    gl.uniform2f(pr.u.uCenter, f.view.cx, f.view.cy);
+    const pixel = f.view.width / w;
+    gl.uniform2f(pr.u.uCenter, toNumber(f.view.cx), toNumber(f.view.cy));
+    gl.uniform2f(pr.u.uRefPx, toNumber(f.view.cx - this.refCx) / pixel, toNumber(f.view.cy - this.refCy) / pixel);
     gl.uniform2f(pr.u.uJitter, jitter[0], jitter[1]);
     gl.uniform1i(pr.u.uMaxIter, f.maxIter);
     gl.uniform1i(pr.u.uPerturb, perturb ? 1 : 0);
@@ -308,7 +313,11 @@ export class Renderer {
     const key = `${v.cx},${v.cy},${maxIter}`;
     if (key === this.orbitKey) return;
     this.orbitKey = key;
-    const orbit = referenceOrbit(v.cx, v.cy, maxIter);
+    const cre = toNumber(v.cx);
+    const cim = toNumber(v.cy);
+    const orbit = referenceOrbit(cre, cim, maxIter);
+    this.refCx = fromNumber(cre);
+    this.refCy = fromNumber(cim);
     const points = orbit.length + 1;
     const rows = Math.ceil(points / ORBIT_ROW);
     const data = new Float32Array(rows * ORBIT_ROW * 2);

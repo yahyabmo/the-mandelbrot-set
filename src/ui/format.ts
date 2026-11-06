@@ -1,3 +1,5 @@
+import { toDecimal, type Fixed } from "../math/fixed";
+
 const SUPERSCRIPT = "⁰¹²³⁴⁵⁶⁷⁸⁹";
 
 export function superscript(n: number): string {
@@ -14,11 +16,15 @@ export function magnificationText(m: number): string {
   return `${(m / 10 ** e).toFixed(1)} × 10${superscript(e)}`;
 }
 
-/** Enough digits to tell one pixel from the next, and no more. */
-export function coordinateText(x: number, width: number): string {
-  const digits = Math.min(17, Math.max(3, Math.ceil(-Math.log10(width / 2000))));
-  const s = x.toFixed(digits);
-  return x >= 0 ? `+${s}` : s;
+/** Decimals shown in the readout, past which the coordinate is cut short. */
+const SHOWN_DIGITS = 20;
+
+/** Enough digits to tell one pixel from the next; the link keeps them all. */
+export function coordinateText(x: Fixed, width: number): string {
+  const digits = Math.max(3, Math.ceil(-Math.log10(width / 2000)));
+  const shown = Math.min(digits, SHOWN_DIGITS);
+  const s = toDecimal(x, shown);
+  return `${s.startsWith("-") ? "" : "+"}${s}${digits > shown ? "…" : ""}`;
 }
 
 /** A length such as 2.7 × 10⁻⁸, or 0.042 when it is readable as it is. */

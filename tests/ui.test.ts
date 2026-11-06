@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import { PLACES } from "../src/places";
 import { coordinateText, magnificationText, scientificText } from "../src/ui/format";
 import { decode, encode, type Shared } from "../src/url";
-import { MIN_WIDTH } from "../src/math/view";
+import { MIN_WIDTH, viewOf } from "../src/math/view";
+import { fromDecimal, fromNumber, toNumber } from "../src/math/fixed";
 import { PALETTES } from "../src/color/palettes";
 
 const state: Shared = {
-  view: { cx: -1.787806383508555, cy: 0.0000568907551128815, width: 4e-9 },
+  view: viewOf("-1.78780638350855487198076170", "0.00005689075511288150404139", 4e-9),
   palette: "turbo-2023",
   density: 1.5,
   offset: 0.25,
@@ -16,9 +17,10 @@ const state: Shared = {
 describe("shared links", () => {
   it("restore exactly the same view", () => {
     const back = decode(encode(state), { ...state, palette: "classic" });
-    expect(back.view.cx).toBe(state.view.cx);
-    expect(back.view.cy).toBe(state.view.cy);
-    expect(back.view.width).toBeCloseTo(state.view.width, 15);
+    // The link keeps the centre to a thousandth of the width, here far past a double.
+    expect(Math.abs(toNumber(back.view.cx - state.view.cx))).toBeLessThan(1e-3 * state.view.width);
+    expect(Math.abs(toNumber(back.view.cy - state.view.cy))).toBeLessThan(1e-3 * state.view.width);
+    expect(back.view.width / state.view.width).toBeCloseTo(1, 6);
     expect(back.palette).toBe("turbo-2023");
     expect(back.density).toBe(1.5);
   });
@@ -28,7 +30,12 @@ describe("shared links", () => {
   });
 
   it("keep a hand-edited link within the reachable depth", () => {
-    expect(decode("#re=0&im=0&w=1e-30", state).view.width).toBe(MIN_WIDTH);
+    expect(decode("#re=0&im=0&w=1e-400", state).view.width).toBe(MIN_WIDTH);
+  });
+
+  it("fall back on the current centre when a coordinate is unreadable", () => {
+    expect(decode("#re=abc&im=0.5&w=0.1", state).view.cx).toBe(state.view.cx);
+    expect(decode("#re=abc&im=0.5&w=0.1", state).view.cy).toBe(fromDecimal("0.5"));
   });
 });
 
@@ -45,8 +52,13 @@ describe("formatting", () => {
   });
 
   it("shows more digits as the view narrows", () => {
-    expect(coordinateText(-0.75, 3.6).length).toBeLessThan(coordinateText(-0.75, 1e-9).length);
-    expect(coordinateText(0.5, 1)).toMatch(/^\+/);
+    const x = fromNumber(-0.75);
+    expect(coordinateText(x, 3.6).length).toBeLessThan(coordinateText(x, 1e-9).length);
+    expect(coordinateText(fromNumber(0.5), 1)).toMatch(/^\+/);
+  });
+
+  it("cuts very long coordinates short in the readout", () => {
+    expect(coordinateText(state.view.cx, 1e-60)).toBe("-1.78780638350855487198…");
   });
 });
 

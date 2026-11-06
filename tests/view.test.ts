@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { autoIterations, MAX_ITERATIONS, MIN_ITERATIONS } from "../src/math/iterations";
+import { fromNumber, toNumber } from "../src/math/fixed";
 import {
   clampWidth,
   ease,
@@ -9,8 +10,12 @@ import {
   panBy,
   settled,
   toComplex,
+  viewOf,
   zoomAt,
+  type View,
 } from "../src/math/view";
+
+const num = ([re, im]: [bigint, bigint]) => [toNumber(re), toNumber(im)];
 
 const W = 1600;
 const H = 900;
@@ -26,20 +31,20 @@ describe("view", () => {
   });
 
   it("keeps the point under the cursor in place while zooming", () => {
-    const before = toComplex(HOME, 300, 200, W, H);
-    const after = toComplex(zoomAt(HOME, 300, 200, W, H, 8), 300, 200, W, H);
+    const before = num(toComplex(HOME, 300, 200, W, H));
+    const after = num(toComplex(zoomAt(HOME, 300, 200, W, H, 8), 300, 200, W, H));
     expect(after[0]).toBeCloseTo(before[0], 12);
     expect(after[1]).toBeCloseTo(before[1], 12);
   });
 
   it("moves the content with the drag", () => {
     const v = panBy(HOME, 100, 0, W);
-    const [re] = toComplex(v, W / 2 + 100, H / 2, W, H);
-    expect(re).toBeCloseTo(HOME.cx, 12);
+    const [re] = num(toComplex(v, W / 2 + 100, H / 2, W, H));
+    expect(re).toBeCloseTo(-0.75, 12);
   });
 
   it("stops at the deepest width the reference can hold", () => {
-    expect(clampWidth(1e-20)).toBe(MIN_WIDTH);
+    expect(clampWidth(MIN_WIDTH / 10)).toBe(MIN_WIDTH);
   });
 
   it("widens the home view on wide screens so that the whole set fits in height", () => {
@@ -55,8 +60,38 @@ describe("view", () => {
   });
 
   it("knows when the motion is over", () => {
-    expect(settled(HOME, { ...HOME, cx: HOME.cx + 1e-9 }, W)).toBe(true);
-    expect(settled(HOME, { ...HOME, cx: HOME.cx + 0.01 }, W)).toBe(false);
+    expect(settled(HOME, { ...HOME, cx: HOME.cx + fromNumber(1e-9) }, W)).toBe(true);
+    expect(settled(HOME, { ...HOME, cx: HOME.cx + fromNumber(0.01) }, W)).toBe(false);
+  });
+
+  it("keeps the point under the cursor in place all along an eased wheel zoom", () => {
+    const target = zoomAt(HOME, 300, 200, W, H, 50);
+    const point = num(toComplex(HOME, 300, 200, W, H));
+    let v: View = HOME;
+    for (let i = 0; i < 6; i++) {
+      v = ease(v, target, 0.3);
+      const here = num(toComplex(v, 300, 200, W, H));
+      expect(Math.abs(here[0] - point[0]) / (v.width / W)).toBeLessThan(1e-6);
+      expect(Math.abs(here[1] - point[1]) / (v.width / W)).toBeLessThan(1e-6);
+    }
+  });
+
+  it("keeps a deep target on screen during the whole dive", () => {
+    const deep = viewOf("-1.78780638350855487198076170", "0.00005689075511288150404139", 3.1e-18);
+    let v: View = HOME;
+    for (let i = 0; i < 400 && v !== deep; i++) {
+      v = settled(v, deep, W) ? deep : ease(v, deep, 0.18, 8 / 60);
+      // Where the target is on screen, in screen widths from the centre.
+      const off = Math.hypot(toNumber(deep.cx - v.cx), toNumber(deep.cy - v.cy)) / v.width;
+      expect(off).toBeLessThan(0.5);
+    }
+    expect(v).toBe(deep);
+  });
+
+  it("limits the speed of a long zoom", () => {
+    const deep = { ...HOME, width: 1e-18 };
+    const next = ease(HOME, deep, 0.18, 8 / 60);
+    expect(Math.log(HOME.width / next.width)).toBeCloseTo(8 / 60, 9);
   });
 });
 

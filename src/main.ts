@@ -1,7 +1,8 @@
 import "./style.css";
 import { paletteById, paletteCss, PALETTES, type Rgb } from "./color/palettes";
 import { autoIterations } from "./math/iterations";
-import { ease, HOME_WIDTH, homeView, MIN_WIDTH, panBy, settled, zoomAt, type View } from "./math/view";
+import { toDecimal, toNumber } from "./math/fixed";
+import { ease, HOME_WIDTH, homeView, MAX_ZOOM_RATE, MIN_WIDTH, panBy, settled, zoomAt, type View } from "./math/view";
 import { PLACES, type Place } from "./places";
 import { Renderer } from "./render/renderer";
 import { coordinateText, magnificationText, scientificText, superscript } from "./ui/format";
@@ -459,7 +460,7 @@ function frame(now: number): void {
     inertia = { x: inertia.x * decay, y: inertia.y * decay };
   }
   if (state.current !== state.target) {
-    state.current = settled(state.current, state.target, w) ? state.target : ease(state.current, state.target, 1 - Math.exp(-dt * 12));
+    state.current = settled(state.current, state.target, w) ? state.target : ease(state.current, state.target, 1 - Math.exp(-dt * 12), MAX_ZOOM_RATE * dt);
   }
   const moving = pointers.size > 0 || gliding || state.current !== state.target;
 
@@ -522,4 +523,13 @@ setTimeout(() => $("hint").classList.add("gone"), 12000);
 requestAnimationFrame(frame);
 
 // For scripted captures and for poking around from the devtools console.
-(window as unknown as { odyssey: unknown }).odyssey = { state, renderer, goTo, PLACES };
+(window as unknown as { odyssey: unknown }).odyssey = {
+  state,
+  renderer,
+  goTo,
+  PLACES,
+  /** The current view in plain numbers, for scripts that cannot read bigints. */
+  here: () => ({ re: toNumber(state.current.cx), im: toNumber(state.current.cy), width: state.current.width }),
+  /** The current centre with every digit. */
+  centre: () => [toDecimal(state.current.cx, 340), toDecimal(state.current.cy, 340)],
+};
