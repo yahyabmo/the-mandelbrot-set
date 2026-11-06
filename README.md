@@ -1,6 +1,6 @@
 # Mandelbrot Odyssey
 
-A real-time journey into the Mandelbrot set, computed live on your graphics card. Scroll into a spiral, fly to the famous places of the set, dive to a magnification of 10³⁰⁰, smoothly, and read the mathematics of what you see in a live atlas: Julia sets, orbits, periods, external rays, and π. Or follow the Odyssey, a story in eight chapters told by the explorer itself.
+A real-time journey into the Mandelbrot set, computed live on your graphics card. Scroll into a spiral, fly to the famous places of the set, dive to a magnification of 10³⁰⁰, smoothly, and read the mathematics of what you see in a live atlas: Julia sets, orbits, periods, external rays, and π. Or follow the Odyssey, a story in eight chapters told by the explorer itself, let the endless dive carry you from minibrot to minibrot down to 10²⁰⁰ and beyond, listen to the orbits, and save the dive as a film.
 
 ## Installation
 
@@ -62,6 +62,10 @@ npm start
 
 *The Odyssey, chapter III. The story frames each place in the part of the screen it leaves free, switches on the layers that explain it, and checks its task live: here the pointer has found a bulb of period 5, whose Julia set the lens shows with its five-pointed orbit.*
 
+![The endless dive on a minibrot of period 833, 10^57 times closer](docs/screenshots/dive.jpg)
+
+*The endless dive, resting on its fifth minibrot: a copy of the whole set, of period 833, 3 × 10⁵⁷ times closer, drawn with 254 900 iterations per pixel. It has already found the next one.*
+
 ![The atlas: the Julia set of the period-3 bulb, its external rays and Lavaurs' diagram](docs/screenshots/atlas.jpg)
 
 *The atlas. The pointer is in the bulb of period 3 at the top: the lens shows its Julia set, Douady's rabbit, and the orbit of 0 settling on a cycle of 3 points. The ring marks the component, and the rays 1/7 and 2/7, which land at its root, are lit, along with their chord in Lavaurs' diagram.*
@@ -101,6 +105,9 @@ npm start
 - **Fly to famous places.** Seahorse valley, a double spiral, elephant valley, a minibrot copy of the whole set, the dendrite at c = i, the end of the original 2023 script at 10¹⁸, and the bottom of the map at 10²⁹⁰. A flight to a place out of sight first pulls back until it is in view, then dives, faster the deeper it goes: 10¹⁸ in about five seconds, 10²⁹⁰ in under twenty.
 - **Follow the Odyssey.** Eight short chapters, from the one rule of the set to the bottom of the map at 10²⁹⁰: one rule, connected or dust, bulbs and periods, a map of rays, π in seahorse valley, copies of itself, diving, the bottom of the map. Each flies to its place and gives a small task, checked as you move. Every chapter has its own link, such as `#chapter=5`.
 - **Read the atlas.** Move the pointer and the lens shows the Julia set of that point, with the orbit of 0 drawn on it: connected inside the set, dust outside. The component under the pointer is ringed, with its period and size, found by Newton's method. Turn on the external rays to see the rays of every component up to period 6, labelled by their angles, and Lavaurs' diagram, the map of how they pair: pick a chord and the explorer flies to its component. The π experiment shows why π appears in seahorse valley and at the cusp.
+- **Dive for ever.** The endless dive flies from minibrot to minibrot, each about twice as deep as the last, through the embedded Julia sets between them, down to 10²⁰⁰ and beyond; at the bottom of the map it surfaces and dives again elsewhere. Press <kbd>D</kbd>.
+- **Listen.** With the sound on, the orbit of the point under the pointer becomes a melody: a cycle of period p is a loop of p notes, an escaping orbit glides away. During the dive you hear the nucleus of the minibrot ahead. Press <kbd>M</kbd>.
+- **Make a film.** *Record a film* renders the dive from the whole set to the current view, one sharp frame at a time, as the script of 2023 did, and saves it as an MP4 in Full HD.
 - **Colour it.** Seven palettes, including *Turbo 2023*, the colours of the original script: 150 steps of Turbo, up and back down. Change the density and the shift, or let the colours flow. Colours change instantly, without recomputing the image.
 - **Always smooth.** While you move, the image is computed at a lower resolution that fits in the frame budget. When you stop, it sharpens, then smooths its edges with up to 12 samples per pixel.
 - **Share it.** The address always holds the current view: copy the link and anyone opens the same place, with the same colours. Save the image as a PNG.
@@ -115,6 +122,8 @@ npm start
 | <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> | move |
 | <kbd>+</kbd> <kbd>−</kbd> | zoom on the centre |
 | <kbd>1</kbd>–<kbd>9</kbd> | famous places |
+| <kbd>D</kbd> | the endless dive |
+| <kbd>M</kbd> | the sound of orbits |
 | <kbd>C</kbd> | flowing colours |
 | <kbd>S</kbd> | save the image |
 | <kbd>H</kbd> | hide the panels |
@@ -139,7 +148,11 @@ Graphics cards compute in 32-bit floats, which blur the image past a magnificati
 
 **The atlas.** The lens draws the Julia set of c on a second, small WebGL canvas. The period of a point inside the set is that of the cycle its orbit settles on; outside, that of the step where its orbit came nearest to 0. Newton's method on z_p(c) = 0 then finds the nucleus of the component, and a classic estimate its size. External rays are traced inwards by Newton's method on z_n(c) = R^(2^(n−1−m)) e^(2πi 2^(n−1) θ), level after level, in a worker; rays that land at a parabolic root approach it slowly, so each one is followed for 300 doublings. Lavaurs' algorithm pairs the angles k / (2^p − 1) of each period without crossing the chords already drawn, and finds exactly the 1, 3, 6, 15 and 27 components of periods 2 to 6.
 
-**Depth.** The limit is a magnification of about 10³⁰⁰, where the size of a pixel stops being an ordinary double. One case is still slow: deep inside a minibrot of small period, every pixel runs all its iterations, and no approximation holds across the returns of its orbit to zero, so the image sharpens in seconds rather than at once.
+**The endless dive.** A box of the plane contains the nucleus of a minibrot of period p when the orbits of its four corners first surround 0 at step p. Newton's method on z_p(c) = 0, in fixed point, then places the nucleus, refined to a fraction of its own size, and the size estimate gives the copy's scale and turn. Inside the copy every minibrot is a tuned copy whose period is a multiple of p, so the dive looks just outside it, in boxes on circles a few sizes away, where embedded Julia sets hold minibrots about twice as deep with a period only a few times longer. It keeps one of those that gain the most depth for the least growth of period: periods 3, 7, 25, 77, 419, 3008 take it from 10⁻² to 10⁻¹⁰¹. Every step is computed in a worker while the camera flies to the previous one.
+
+**Inside a minibrot.** A reference at a nucleus has an orbit one period long that ends back at 0: the pixels rebase onto its start at each period. Inside the copy, a pixel then comes back to the same offset at every return; two returns that agree to 2⁻²⁰ mark it as inside, and it stops. Outside, near the copy, an orbit makes about one turn of the period for each step the whole set would take, so a view of a deep copy needs hundreds of periods, millions of iterations, which the approximations reduce to a few hundred steps per pixel. The image in motion lowers its iterations when even the smallest preview would be late, and the image at rest batches more rows into each frame when a single row is already as slow as a whole one.
+
+**Depth.** The limit is a magnification of about 10³⁰⁰, where the size of a pixel stops being an ordinary double.
 
 ```
 src/math/fixed.ts        numbers in fixed point on BigInt, for centres beyond double precision
@@ -150,6 +163,9 @@ src/math/view.ts         view, zoom around a point, flights
 src/math/atlas.ts        orbits, periods, nuclei, sizes, external rays, Lavaurs' diagram, π (tested)
 src/atlas/               the lens, the drawings over the image, Lavaurs' diagram, the atlas worker
 src/story/               the eight chapters of the Odyssey and their tasks (tested), the story plate
+src/math/minibrot.ts     the period of a box, nuclei by Newton in fixed point, sizes (tested)
+src/dive/                the plan of the endless dive (tested), its worker, the camera
+src/senses/              the sound of orbits, the films
 src/render/shaders.ts    the same iteration in GLSL, colouring, display
 src/render/reference.ts  which reference to draw with, and when to ask for a new one
 src/render/orbit-worker.ts  deep orbits and their tables, off the page
@@ -176,12 +192,13 @@ The site runs locally. `.github/workflows/ci.yml` runs the tests and the build o
 - [x] **Phase 2.** Deep zoom to 10³⁰⁰: arbitrary-precision reference in a worker, offsets that carry their own exponent, bilinear approximation, the 2023 dive to 10¹⁸.
 - [x] **Phase 3.** Atlas: Julia sets and orbits under the pointer, periods and sizes of components, external rays, Lavaurs' diagram, π in seahorse valley.
 - [x] **Phase 4.** Odyssey: an interactive story in eight chapters, driven by the live explorer, with live tasks.
-- [ ] **Phase 5.** Senses: orbits as sound, an endless automatic dive, video export.
+- [x] **Phase 5.** Senses: the endless dive through embedded Julia sets, the inside of minibrots detected, orbits as sound, films in MP4.
 - [ ] **Phase 6.** Buddhabrot, 3D relief, other fractals.
 
 ## Credits
 
 - The Turbo colormap is by Google (Apache-2.0), read from OpenCV's `COLORMAP_TURBO`.
+- Films are written to MP4 with [Mediabunny](https://mediabunny.dev) (MPL-2.0), over the WebCodecs of the browser.
 - Perturbation for deep zoom was introduced by K. I. Martin. Rebasing and the bilinear approximation were introduced by Zhuoran on Fractal Forums. The continuous count follows Inigo Quilez's article on smooth iteration.
 - π in seahorse valley was found by Dave Boll in 1991. Lavaurs' diagram and its algorithm are due to Pierre Lavaurs (1986). Tracing external rays by Newton's method follows Tomoki Kawahira's algorithm.
 - The original 2023 script, kept in [`legacy/`](legacy/), rendered this zoom one image at a time with 80-bit arithmetic.
