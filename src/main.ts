@@ -459,7 +459,9 @@ function capture(): void {
 }
 
 function frame(now: number): void {
-  const dt = Math.min(0.1, (now - last) / 1000);
+  // The first timestamp of requestAnimationFrame may come before the page script started.
+  const elapsed = Math.max(0, now - last);
+  const dt = Math.min(0.1, elapsed / 1000);
   last = now;
   fps = 0.92 * fps + 0.08 * (1 / Math.max(dt, 1e-3));
   resize();
@@ -497,7 +499,7 @@ function frame(now: number): void {
     moving,
     allowSamples,
   });
-  renderer.adapt(dt * 1000);
+  renderer.adapt(Math.min(100, elapsed));
 
   if (state.captureSince) {
     const ready = status.sharp && (!allowSamples || status.samples >= CAPTURE_SAMPLES);

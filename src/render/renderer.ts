@@ -13,6 +13,8 @@ const ORBIT_ROW = 4096;
 const MAX_SAMPLES = 12;
 /** Share of a screen refresh given to the fractal, the rest is for the page and the compositor. */
 const BUDGET_SHARE = 0.7;
+/** No screen refreshes faster than this; shorter frames are timing glitches. */
+const MIN_REFRESH_MS = 4;
 /** Lowest resolution of the image in motion: blurred, but never a slide show. */
 const MIN_MOTION_SCALE = 0.08;
 /** A frame this much longer than a refresh was held back by the GPU, not by the screen. */
@@ -169,8 +171,10 @@ export class Renderer {
 
   /** Tell the renderer how long the last frame took: it learns what one iteration costs. */
   adapt(frameMs: number): void {
+    // Shorter than any screen refreshes: a timing glitch, which would make every frame look late.
+    if (frameMs < MIN_REFRESH_MS) return;
     // The shortest frames give the refresh interval; it may slowly grow back if the screen changes.
-    this.refreshMs = Math.min(this.refreshMs * 1.002, Math.max(4, frameMs));
+    this.refreshMs = Math.min(this.refreshMs * 1.002, frameMs);
     if (this.lastWork <= 0) return;
     const bound = this.refreshMs * BOUND_FACTOR;
     const e = this.lastEngine;
