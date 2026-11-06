@@ -1,10 +1,10 @@
 import "./style.css";
 import { paletteById, paletteCss, PALETTES, type Rgb } from "./color/palettes";
 import { autoIterations } from "./math/iterations";
-import { ease, homeView, MIN_WIDTH, panBy, settled, zoomAt, type View } from "./math/view";
+import { ease, HOME_WIDTH, homeView, MIN_WIDTH, panBy, settled, zoomAt, type View } from "./math/view";
 import { PLACES, type Place } from "./places";
 import { Renderer } from "./render/renderer";
-import { coordinateText, magnificationText } from "./ui/format";
+import { coordinateText, magnificationText, scientificText, superscript } from "./ui/format";
 import { decode, encode } from "./url";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -56,6 +56,7 @@ const state = {
 // ---------------------------------------------------------------------------
 
 const placeButtons = PLACES.map((p, i) => {
+  const item = document.createElement("li");
   const b = document.createElement("button");
   b.type = "button";
   b.className = "place";
@@ -63,9 +64,20 @@ const placeButtons = PLACES.map((p, i) => {
   b.querySelector("b")!.textContent = p.name;
   b.querySelector("span")!.textContent = p.blurb;
   b.addEventListener("click", () => goTo(p));
-  $("places").append(b);
+  item.append(b);
+  $("places").append(item);
   return b;
 });
+
+// The depth gauge: one tick per decade of magnification, down to the deepest this version reaches.
+const GAUGE_DECADES = Math.floor(Math.log10(HOME_WIDTH / MIN_WIDTH));
+for (let d = 0; d <= GAUGE_DECADES; d++) {
+  const tick = document.createElement("div");
+  tick.className = d % 3 === 0 ? "gauge-tick major" : "gauge-tick";
+  tick.style.top = `${(100 * d) / GAUGE_DECADES}%`;
+  if (d % 3 === 0) tick.innerHTML = `<span>10${superscript(d)}</span>`;
+  $("gauge-track").append(tick);
+}
 
 const paletteButtons = PALETTES.map((p) => {
   const b = document.createElement("button");
@@ -391,7 +403,12 @@ function frame(now: number): void {
   if (now - hudAt > 120) {
     hudAt = now;
     const v = state.current;
-    $("hud-zoom").textContent = magnificationText(homeView(...size()).width / v.width);
+    const [w] = size();
+    const magnification = homeView(...size()).width / v.width;
+    $("hud-zoom").textContent = magnificationText(magnification);
+    const depth = Math.min(1, Math.max(0, Math.log10(Math.max(1, magnification)) / GAUGE_DECADES));
+    $("gauge-mark").style.top = `${100 * depth}%`;
+    $("scale-text").textContent = `120 px = ${scientificText((v.width / w) * 120)}`;
     $("hud-re").textContent = coordinateText(v.cx, v.width);
     $("hud-im").textContent = coordinateText(v.cy, v.width);
     $("hud-iter").textContent = maxIter.toLocaleString("en-US");

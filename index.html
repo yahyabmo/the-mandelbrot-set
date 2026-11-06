@@ -5,38 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Mandelbrot Odyssey</title>
     <meta name="description" content="A real-time journey into the Mandelbrot set, computed live on your graphics card." />
-    <meta name="theme-color" content="#04050a" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2304050a'/><circle cx='19' cy='16' r='7' fill='%23f2c46d'/><circle cx='9.5' cy='16' r='3.5' fill='%23f2c46d'/><circle cx='4.6' cy='16' r='1.3' fill='%23f2c46d'/></svg>" />
+    <meta name="theme-color" content="#0a0b0f" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230a0b0f'/><circle cx='19' cy='16' r='7' fill='%23f6f3ea'/><circle cx='9.5' cy='16' r='3.5' fill='%23f6f3ea'/><circle cx='4.6' cy='16' r='1.3' fill='%23efc879'/></svg>" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
   <body>
     <canvas id="stage" aria-label="The Mandelbrot set. Scroll to zoom, drag to move."></canvas>
+    <div class="reticle" aria-hidden="true"></div>
 
-    <header class="brand glass">
-      <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
-        <circle cx="19" cy="16" r="7" fill="currentColor" />
-        <circle cx="9.5" cy="16" r="3.5" fill="currentColor" />
-        <circle cx="4.6" cy="16" r="1.3" fill="currentColor" />
-      </svg>
-      <div>
-        <div class="brand-name">Mandelbrot Odyssey</div>
-        <div class="brand-sub">explorer</div>
-      </div>
+    <header class="plate brand">
+      <div class="brand-title">Mandelbrot <em>Odyssey</em></div>
+      <div class="brand-sub">An atlas of the complex plane</div>
     </header>
 
-    <button class="panel-toggle glass" id="panel-toggle" type="button" aria-label="Show or hide the panel" aria-expanded="true">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+    <div class="plate gauge" aria-hidden="true">
+      <div class="gauge-label">depth</div>
+      <div class="gauge-track" id="gauge-track">
+        <div class="gauge-mark" id="gauge-mark"></div>
+      </div>
+    </div>
+
+    <button class="plate panel-toggle" id="panel-toggle" type="button" aria-label="Show or hide the index" aria-expanded="true">
+      <span>Index</span>
     </button>
 
-    <aside class="panel glass" id="panel" aria-label="Controls">
+    <aside class="plate panel" id="panel" aria-label="Controls">
       <section>
-        <h2>Places</h2>
-        <div class="places" id="places"></div>
+        <h2><span>I</span> Places</h2>
+        <ol class="places" id="places"></ol>
       </section>
       <section>
-        <h2>Colours</h2>
+        <h2><span>II</span> Colours</h2>
         <div class="palettes" id="palettes"></div>
         <label class="slider">
           <span>Density <output id="density-out"></output></span>
@@ -47,22 +48,22 @@
           <input id="offset" type="range" min="0" max="1" step="0.001" value="0" />
         </label>
         <div class="row">
-          <button type="button" class="chip" id="cycle" aria-pressed="false">Animate colours</button>
-          <input id="cycle-speed" type="range" min="0.02" max="0.6" step="0.01" value="0.12" aria-label="Animation speed" />
+          <button type="button" class="toggle" id="cycle" aria-pressed="false">Flow</button>
+          <input id="cycle-speed" type="range" min="0.02" max="0.6" step="0.01" value="0.12" aria-label="Flow speed" />
         </div>
       </section>
       <section>
-        <h2>Detail</h2>
+        <h2><span>III</span> Detail</h2>
         <label class="slider">
           <span>Iterations <output id="detail-out"></output></span>
           <input id="detail" type="range" min="-2" max="2" step="0.01" value="0" />
         </label>
         <div class="row">
-          <button type="button" class="chip" id="smooth" aria-pressed="true">Smooth edges</button>
+          <button type="button" class="toggle" id="smooth" aria-pressed="true">Smooth edges</button>
         </div>
       </section>
       <section>
-        <h2>Share</h2>
+        <h2><span>IV</span> Keep</h2>
         <div class="row">
           <button type="button" class="action" id="copy-link">Copy link</button>
           <button type="button" class="action" id="save-image">Save image</button>
@@ -71,8 +72,9 @@
       </section>
     </aside>
 
-    <div class="hud glass" id="hud" aria-live="off">
-      <div class="zoom"><span id="hud-zoom">1.00×</span><small>zoom</small></div>
+    <div class="plate readout" id="hud" aria-live="off">
+      <div class="readout-label">magnification</div>
+      <div class="readout-zoom" id="hud-zoom">1.00×</div>
       <dl>
         <dt>re</dt><dd id="hud-re"></dd>
         <dt>im</dt><dd id="hud-im"></dd>
@@ -81,11 +83,16 @@
         <dt>image</dt><dd id="hud-image"></dd>
         <dt>fps</dt><dd id="hud-fps"></dd>
       </dl>
-      <p class="limit" id="hud-limit" hidden>Deepest zoom of this version: the arbitrary-precision engine comes next.</p>
+      <p class="limit" id="hud-limit" hidden>Deepest zoom of this version.</p>
     </div>
 
-    <p class="hint" id="hint">
-      <kbd>scroll</kbd> zoom · <kbd>drag</kbd> move · <kbd>double-click</kbd> dive · <kbd>H</kbd> hide panels · <kbd>1</kbd>–<kbd>8</kbd> places
+    <div class="plate scalebar" aria-hidden="true">
+      <div class="scalebar-rule"></div>
+      <div class="scalebar-text" id="scale-text"></div>
+    </div>
+
+    <p class="plate hint" id="hint">
+      <kbd>scroll</kbd> zoom <kbd>drag</kbd> move <kbd>double-click</kbd> dive <kbd>H</kbd> hide <kbd>1</kbd>–<kbd>8</kbd> places
     </p>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <div class="fatal" id="fatal" hidden></div>

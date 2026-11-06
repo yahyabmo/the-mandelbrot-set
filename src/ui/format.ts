@@ -20,3 +20,10 @@ export function coordinateText(x: number, width: number): string {
   const s = x.toFixed(digits);
   return x >= 0 ? `+${s}` : s;
 }
+
+/** A length such as 2.7 × 10⁻⁸, or 0.042 when it is readable as it is. */
+export function scientificText(x: number): string {
+  if (x >= 1e-3 && x < 1e4) return x.toPrecision(2);
+  const e = Math.floor(Math.log10(x));
+  return `${(x / 10 ** e).toFixed(1)} × 10${superscript(e)}`;
+}
