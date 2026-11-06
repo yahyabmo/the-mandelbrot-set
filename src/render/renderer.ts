@@ -224,8 +224,11 @@ export class Renderer {
     }
   }
 
+  /** Rendering a film: no screen to keep up with, so each pass may take its time. */
+  offline = false;
+
   private get budgetMs(): number {
-    return Math.max(5, this.refreshMs * BUDGET_SHARE);
+    return this.offline ? 250 : Math.max(5, this.refreshMs * BUDGET_SHARE);
   }
 
   /** Rows of the full image that fit in the budget, for this engine and iteration limit. */

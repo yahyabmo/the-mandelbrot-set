@@ -9,6 +9,7 @@ import { Renderer, type Status } from "./render/renderer";
 import { Story } from "./story/story";
 import { AutoDive } from "./dive/autodive";
 import { OrbitSound } from "./senses/sound";
+import { recordFilm, filmSeconds } from "./senses/recorder";
 import { coordinateText, magnificationHtml, scientificText, superscript } from "./ui/format";
 import { decode, encode } from "./url";
 
@@ -319,6 +320,65 @@ function toggleSound(): void {
 }
 $("sound-toggle").addEventListener("click", toggleSound);
 
+// A film of the dive to the current view, frame by frame, in Full HD.
+let recording = false;
+let stopRecording = false;
+const FILM = { fps: 30, width: 1920, height: 1080, samples: 4 };
+async function recordView(): Promise<void> {
+  if (recording) {
+    stopRecording = true;
+    return;
+  }
+  dive.stop();
+  story.close();
+  const to = state.target;
+  const from = homeView(FILM.width, FILM.height);
+  recording = true;
+  stopRecording = false;
+  $("record").textContent = "Stop";
+  const status = $("record-status");
+  status.textContent = `A film of ${Math.round(filmSeconds(from, to))} s: getting ready…`;
+  try {
+    const film = await recordFilm(
+      {
+        renderer,
+        canvas,
+        frameOf: (view, target) => ({
+          view,
+          maxIter: Math.max(autoIterations(view.width, state.detail), state.minIter),
+          target,
+          targetIter: Math.max(autoIterations(target.width, state.detail), state.minIter),
+          palette: state.palette,
+          period: state.palette.period / state.density,
+          offset: state.offset,
+          interior: INTERIOR,
+          moving: false,
+          allowSamples: true,
+        }),
+        progress: (done, total) => (status.textContent = `Recording: frame ${done} of ${total}`),
+      },
+      from,
+      to,
+      FILM,
+      () => stopRecording,
+    );
+    if (film) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(film);
+      a.download = `mandelbrot-dive-${state.place ?? "view"}.mp4`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+      status.textContent = `Film saved: ${(film.size / 1e6).toFixed(1)} MB.`;
+    } else status.textContent = "Recording stopped.";
+  } catch (e) {
+    status.textContent = (e as Error).message;
+  } finally {
+    recording = false;
+    $("record").textContent = "Record a film";
+  }
+}
+$("record").addEventListener("click", () => void recordView());
+
 /** "#chapter=3" opens the third chapter of the story. */
 const chapterIn = (hash: string) => {
   const m = /^#chapter=(\d+)$/.exec(hash);
@@ -557,6 +617,12 @@ function capture(): void {
 }
 
 function frame(now: number): void {
+  // While a film is being rendered, the recorder has the canvas to itself.
+  if (recording) {
+    last = now;
+    requestAnimationFrame(frame);
+    return;
+  }
   // The first timestamp of requestAnimationFrame may come before the page script started.
   const elapsed = Math.max(0, now - last);
   const dt = Math.min(0.1, elapsed / 1000);
@@ -665,6 +731,7 @@ requestAnimationFrame(frame);
   atlas,
   dive,
   sound,
+  recordView,
   /** The current view in plain numbers, for scripts that cannot read bigints. */
   here: () => ({ re: toNumber(state.current.cx), im: toNumber(state.current.cy), width: state.current.width }),
   /** The current centre with every digit. */
