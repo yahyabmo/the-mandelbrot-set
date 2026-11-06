@@ -5,7 +5,7 @@ import { toDecimal, toNumber } from "./math/fixed";
 import { ease, flightPath, HOME_WIDTH, homeView, inSight, MAX_ZOOM_RATE, MIN_WIDTH, panBy, settled, zoomAt, type View } from "./math/view";
 import { PLACES, type Place } from "./places";
 import { Renderer } from "./render/renderer";
-import { coordinateText, magnificationText, scientificText, superscript } from "./ui/format";
+import { coordinateText, magnificationHtml, scientificText, superscript } from "./ui/format";
 import { decode, encode } from "./url";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -509,7 +509,7 @@ function frame(now: number): void {
     const v = state.current;
     const [w] = size();
     const magnification = homeView(...size()).width / v.width;
-    $("hud-zoom").textContent = magnificationText(magnification);
+    $("hud-zoom").innerHTML = magnificationHtml(magnification);
     const depth = Math.min(1, Math.max(0, Math.log10(Math.max(1, magnification)) / GAUGE_DECADES));
     $("gauge-mark").style.top = `${100 * depth}%`;
     $("scale-text").textContent = `120 px = ${scientificText((v.width / w) * 120)}`;

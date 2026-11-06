@@ -19,6 +19,13 @@ export function magnificationText(m: number): string {
 /** Decimals shown in the readout, past which the coordinate is cut short. */
 const SHOWN_DIGITS = 18;
 
+/** The same as HTML, with a real superscript: display faces often lack the superscript digits. */
+export function magnificationHtml(m: number): string {
+  if (m < 1e4) return magnificationText(m);
+  const e = Math.floor(Math.log10(m));
+  return `${(m / 10 ** e).toFixed(1)} × 10<sup>${e}</sup>`;
+}
+
 /** Enough digits to tell one pixel from the next; the link keeps them all. */
 export function coordinateText(x: Fixed, width: number): string {
   const digits = Math.max(3, Math.ceil(-Math.log10(width / 2000)));

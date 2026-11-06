@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PLACES } from "../src/places";
-import { coordinateText, magnificationText, scientificText } from "../src/ui/format";
+import { coordinateText, magnificationHtml, magnificationText, scientificText } from "../src/ui/format";
 import { decode, encode, type Shared } from "../src/url";
 import { MIN_WIDTH, viewOf } from "../src/math/view";
 import { fromDecimal, fromNumber, toNumber } from "../src/math/fixed";
@@ -44,6 +44,8 @@ describe("formatting", () => {
     expect(magnificationText(1)).toBe("1.00×");
     expect(magnificationText(240)).toBe("240×");
     expect(magnificationText(2.4e8)).toBe("2.4 × 10⁸");
+    expect(magnificationHtml(4.5e290)).toBe("4.5 × 10<sup>290</sup>");
+    expect(magnificationHtml(240)).toBe("240×");
   });
 
   it("writes lengths of the scale bar readably", () => {

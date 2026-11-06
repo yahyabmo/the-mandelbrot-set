@@ -533,6 +533,12 @@ kbd {
   margin: 2px 0 8px;
   font-variant-numeric: tabular-nums;
 }
+.readout-zoom sup {
+  font-size: 0.56em;
+  line-height: 0;
+  vertical-align: 0.75em;
+  margin-left: 0.04em;
+}
 .readout dl {
   display: grid;
   grid-template-columns: auto 1fr;

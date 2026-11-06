@@ -3,7 +3,6 @@ import { BAILOUT, smooth } from "../src/math/mandelbrot";
 
 /** Fixed-point iteration with BigInt: the ground truth the double-precision methods are judged by. */
 const BITS = 400n;
-const ONE = 1n << BITS;
 
 /** The exact value of a double as a fixed-point number: a double is m * 2^e. */
 export function toFixed(x: number): bigint {
@@ -23,20 +22,20 @@ export function iterateExact(cre: number, cim: number, maxIter: number): number 
 }
 
 /** The same for a point given in the fixed point of the app, beyond double precision. */
-export function iterateExactAt(cre: Fixed, cim: Fixed, maxIter: number): number {
-  return iterateExactBits(toBits(cre, Number(BITS)), toBits(cim, Number(BITS)), maxIter);
+export function iterateExactAt(cre: Fixed, cim: Fixed, maxIter: number, bits = Number(BITS)): number {
+  return iterateExactBits(toBits(cre, bits), toBits(cim, bits), maxIter, BigInt(bits));
 }
 
-function iterateExactBits(cr: bigint, ci: bigint, maxIter: number): number {
-  const escape = BigInt(BAILOUT * BAILOUT) * ONE;
+function iterateExactBits(cr: bigint, ci: bigint, maxIter: number, B = BITS): number {
+  const escape = BigInt(BAILOUT * BAILOUT) << B;
   let x = 0n;
   let y = 0n;
   for (let i = 0; i < maxIter; i++) {
-    const nx = ((x * x - y * y) >> BITS) + cr;
-    y = ((2n * x * y) >> BITS) + ci;
+    const nx = ((x * x - y * y) >> B) + cr;
+    y = ((2n * x * y) >> B) + ci;
     x = nx;
-    const r2 = (x * x + y * y) >> BITS;
-    if (r2 > escape) return smooth(i, Number(r2 >> (BITS - 52n)) / 2 ** 52);
+    const r2 = (x * x + y * y) >> B;
+    if (r2 > escape) return smooth(i, Number(r2 >> (B - 52n)) / 2 ** 52);
   }
   return -1;
 }

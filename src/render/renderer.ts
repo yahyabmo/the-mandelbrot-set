@@ -1,6 +1,7 @@
 import { paletteTexels, type Palette, type Rgb } from "../color/palettes";
 import { toNumber, type Fixed } from "../math/fixed";
 import type { View } from "../math/view";
+import { SCALED_BELOW, splitPixel } from "../math/deep";
 import { References, type Reference } from "./reference";
 import { COLOURIZE, COUNT, DISPLAY, SAMPLE, VERTEX } from "./shaders";
 
@@ -316,6 +317,10 @@ export class Renderer {
     gl.uniform2f(pr.u.uJitter, jitter[0], jitter[1]);
     gl.uniform1i(pr.u.uMaxIter, f.maxIter);
     gl.uniform1i(pr.u.uPerturb, perturb ? 1 : 0);
+    const [pm, pe] = splitPixel(pixel);
+    gl.uniform1i(pr.u.uScaled, pixel < SCALED_BELOW ? 1 : 0);
+    gl.uniform1f(pr.u.uPixelM, pm);
+    gl.uniform1i(pr.u.uPixelE, pe);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.orbit);
     gl.uniform1i(pr.u.uOrbit, 1);

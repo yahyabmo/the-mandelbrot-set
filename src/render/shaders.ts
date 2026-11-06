@@ -1,6 +1,7 @@
 /**
- * GLSL for WebGL2. The iteration follows src/math/mandelbrot.ts line for line, so that
- * the tests of the CPU version also vouch for these shaders.
+ * GLSL for WebGL2. The iteration follows src/math/mandelbrot.ts and, below the range of
+ * a float32, src/math/deep.ts line for line, so that the tests of the CPU versions also
+ * vouch for these shaders.
  */
 
 export const VERTEX = `#version 300 es
@@ -23,14 +24,25 @@ uniform vec2 uRefPx;      // view centre minus the reference point, in pixels
 uniform vec2 uJitter;     // sub-pixel offset of this sample
 uniform int uMaxIter;
 uniform int uPerturb;     // 0: direct float32, 1: perturbation around the reference orbit
+uniform int uScaled;      // 1: pixels too small for a float32, the offsets carry an exponent
+uniform float uPixelM;    // pixel size = uPixelM * 2^uPixelE
+uniform int uPixelE;
 uniform sampler2D uOrbit; // reference orbit Z_0..Z_n as RG32F, 4096 per row
 uniform int uOrbitLen;
 
 const float BAILOUT2 = 65536.0;
+const int LEAVE = -100;          // an offset above 2^LEAVE fits a plain float again
+const float SMALL_Z = 8.6736174e-19; // 2^-60
+const int NONE = -100000;
 
 vec2 cmul(vec2 a, vec2 b) { return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x); }
 vec2 orbitAt(int k) { return texelFetch(uOrbit, ivec2(k & 4095, k >> 12), 0).xy; }
 float smoothCount(int i, float r2) { return float(i) - log2(log2(r2)) + 4.0; }
+float maxAbs(vec2 v) { return max(abs(v.x), abs(v.y)); }
+/** Exponent of a float, read from its bits: -127 for 0. */
+int expo(float x) { return ((floatBitsToInt(x) >> 23) & 255) - 127; }
+/** 2^k: 0 below the normal range, capped at 2^127. */
+float p2(int k) { return k < -126 ? 0.0 : intBitsToFloat((min(k, 127) + 127) << 23); }
 
 /** Continuous iteration count of the sample, or -1 inside the set. */
 float iterate() {
@@ -45,11 +57,71 @@ float iterate() {
     }
     return -1.0;
   }
-  // dz <- 2 Z dz + dz^2 + dc, z = Z + dz, rebasing to the start of the orbit when needed.
-  vec2 dc = (px + uRefPx) * uPixel;
+
+  vec2 dcPx = px + uRefPx;
+  vec2 dc;
   vec2 dz = vec2(0.0);
   int m = 0;
-  for (int i = 0; i < uMaxIter; i++) {
+  int i = 0;
+  if (uScaled == 1) {
+    // dz = w 2^e and dc = dcm 2^ec, the terms of each step brought to a common exponent
+    // before they are added (see src/math/deep.ts, which this follows line for line).
+    vec2 dcm = dcPx * uPixelM;
+    int ec = uPixelE;
+    int eC = ec + expo(maxAbs(dcm));
+    vec2 w = dcm;
+    int e = ec;
+    float wa = maxAbs(w);
+    if (wa > 0.0) { int k = expo(wa); w *= p2(-k); e += k; }
+    m = 1;
+    i = 1;
+    bool plain = false;
+    for (; i < uMaxIter; i++) {
+      vec2 Z = orbitAt(m);
+      float za = maxAbs(Z);
+      int E = max(max(za > 0.0 ? e + 1 + expo(za) : NONE, 2 * e), eC);
+      w = 2.0 * cmul(Z, w) * p2(e - E) + cmul(w, w) * p2(2 * e - E) + dcm * p2(ec - E);
+      e = E;
+      wa = maxAbs(w);
+      if (wa > 0.0) { int k = expo(wa); w *= p2(-k); e += k; }
+      m++;
+      if (e > LEAVE || m == uOrbitLen) {
+        dz = w * p2(e);
+        plain = true;
+        break;
+      }
+      vec2 Zm = orbitAt(m);
+      float zma = maxAbs(Zm);
+      if (zma > 0.0 && zma < SMALL_Z) {
+        // z = Z + dz with both small: rebase when z comes closer to 0 than dz.
+        int ez = max(expo(zma), e);
+        vec2 zm = Zm * p2(-ez) + w * p2(e - ez);
+        if (dot(zm, zm) < dot(w, w) * p2(2 * (e - ez))) {
+          w = zm;
+          e = ez;
+          wa = maxAbs(w);
+          if (wa > 0.0) { int k = expo(wa); w *= p2(-k); e += k; }
+          m = 0;
+        }
+      }
+    }
+    if (!plain) return -1.0;
+    dc = dcm * p2(ec);
+    // Finish the step the deep loop left at, as the plain loop would.
+    vec2 z = orbitAt(m) + dz;
+    float r2 = dot(z, z);
+    if (r2 > BAILOUT2) return smoothCount(i, r2);
+    if (r2 < dot(dz, dz) || m == uOrbitLen) {
+      dz = z;
+      m = 0;
+    }
+    i++;
+  } else {
+    dc = dcPx * uPixel;
+  }
+
+  // dz <- 2 Z dz + dz^2 + dc, z = Z + dz, rebasing to the start of the orbit when needed.
+  for (; i < uMaxIter; i++) {
     vec2 Z = orbitAt(m);
     dz = 2.0 * cmul(Z, dz) + cmul(dz, dz) + dc;
     m++;
