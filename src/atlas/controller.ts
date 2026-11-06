@@ -242,6 +242,12 @@ export class Atlas {
     const digits = Math.min(14, Math.max(4, Math.ceil(-Math.log10(v.width / 1000))));
     const [x, y] = this.probe;
     $("lens-c").textContent = `${x.toFixed(digits)} ${y < 0 ? "−" : "+"} ${Math.abs(y).toFixed(digits)}i`;
+    if (v.width < ATLAS_DEPTH) {
+      // Below doubles, the reading would be that of a neighbour: say nothing rather than wrong.
+      $("lens-fate").textContent = "deeper than the atlas";
+      $("lens-component").textContent = "–";
+      return;
+    }
     $("lens-fate").textContent = r.escape > 0 ? `escapes at step ${r.escape.toLocaleString("en-US")}` : "stays bounded";
     $("lens-component").textContent =
       r.nucleus && r.size && this.near(r) ? `period ${r.period}, size ${scientificText(Math.hypot(...r.size))}` : r.escape > 0 ? "outside" : `period ${r.period}`;
