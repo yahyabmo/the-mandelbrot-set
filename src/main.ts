@@ -57,7 +57,7 @@ const state = {
 // Panel
 // ---------------------------------------------------------------------------
 
-// Places: a drop-down list in the panel. The keys 1 to 8 reach them too.
+// Places: a drop-down list in the panel. The keys 1 to 9 reach them too.
 const placeButton = $("place-button");
 const placeList = $("place-list");
 const placeOptions = PLACES.map((p, i) => {

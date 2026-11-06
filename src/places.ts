@@ -54,4 +54,11 @@ export const PLACES: Place[] = [
     view: viewOf("-1.78780638350855487198076170", "0.00005689075511288150404139", 3.1e-18),
     palette: "turbo-2023",
   },
+  {
+    id: "bottom",
+    name: "The bottom of the map",
+    blurb: "The dendrite at c = i again, 10²⁹⁰ times closer",
+    view: viewOf("0", "1", 1e-290),
+    palette: "glacier",
+  },
 ];
