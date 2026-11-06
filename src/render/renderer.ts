@@ -53,6 +53,12 @@ interface Target {
 }
 
 type Program = { p: WebGLProgram; u: Record<string, WebGLUniformLocation | null> };
+/** What a frame was computed with: each has its own cost per pixel and allowed iteration. */
+type Engine = "direct" | "perturbation" | "skipping";
+/** On time while the view rests, the next frame takes this much more work... */
+const PROBE = 1 / 0.85;
+/** ...unless a frame came late within this many frames. */
+const HOLD_FRAMES = 30;
 
 /** Halton(2, 3) offsets in [-0.5, 0.5): evenly spread sub-pixel positions. */
 function halton(i: number, base: number): number {
@@ -98,9 +104,13 @@ export class Renderer {
    * Milliseconds per pixel and per allowed iteration, learnt from the frames themselves.
    * Starting values come from a measure on an integrated AMD GPU.
    */
-  private cost = { direct: 1e-8, perturbation: 4.5e-8 };
+  private cost = { direct: 1e-8, perturbation: 4.5e-8, skipping: 4e-9 };
   private lastWork = 0;
-  private lastEngine: "direct" | "perturbation" = "direct";
+  private lastEngine: Engine = "direct";
+  /** True when the last frame refined a resting view: on time, it may try a little more. */
+  private lastRefined = false;
+  /** Frames to wait after a slow one before trying more again. */
+  private hold = 0;
   private motionScale = 0.6;
   /** Interval between screen refreshes, read from the shortest frames: 8.3 ms at 120 Hz. */
   private refreshMs = 16.7;
@@ -164,9 +174,15 @@ export class Renderer {
     if (this.lastWork <= 0) return;
     const bound = this.refreshMs * BOUND_FACTOR;
     const e = this.lastEngine;
-    // A slow frame measures the cost; a frame on time only says the cost is at most this much.
-    if (frameMs > bound) this.cost[e] = 0.7 * this.cost[e] + 0.3 * (frameMs / this.lastWork);
+    const measured = frameMs / this.lastWork;
+    // A slow frame measures the cost, at once when it is far off. A frame on time only says
+    // the cost is at most this much: while the view rests, try a little more work.
+    if (frameMs > 2 * bound) this.cost[e] = Math.max(this.cost[e], measured);
+    else if (frameMs > bound) this.cost[e] = 0.7 * this.cost[e] + 0.3 * measured;
+    else if (this.lastRefined && this.hold === 0) this.cost[e] /= PROBE;
     else this.cost[e] = Math.min(this.cost[e], bound / this.lastWork);
+    if (frameMs > bound) this.hold = HOLD_FRAMES;
+    else if (this.hold > 0) this.hold--;
   }
 
   private get budgetMs(): number {
@@ -174,8 +190,8 @@ export class Renderer {
   }
 
   /** Rows of the full image that fit in the budget, for this engine and iteration limit. */
-  private rowsInBudget(perturb: boolean, maxIter: number): number {
-    const c = this.cost[perturb ? "perturbation" : "direct"];
+  private rowsInBudget(maxIter: number): number {
+    const c = this.cost[this.lastEngine];
     return Math.max(1, Math.floor(this.budgetMs / (c * this.width * maxIter)));
   }
 
@@ -216,8 +232,9 @@ export class Renderer {
       this.sampleRows = 0;
     }
 
-    this.lastEngine = perturb ? "perturbation" : "direct";
+    this.lastEngine = !perturb ? "direct" : this.bla ? "skipping" : "perturbation";
     this.lastWork = 0;
+    this.lastRefined = !f.moving;
     const fullDone = this.fullRows >= this.height;
     if (f.moving || (!fullDone && !this.lowValid)) {
       // A quick, lower-resolution image: always complete, always on time.
@@ -231,7 +248,7 @@ export class Renderer {
       this.lastWork += w * h * f.maxIter;
     }
     if (!f.moving && !fullDone) {
-      const rows = Math.min(this.rowsInBudget(perturb, f.maxIter), this.height - this.fullRows);
+      const rows = Math.min(this.rowsInBudget(f.maxIter), this.height - this.fullRows);
       this.drawCounts(this.full!, f, perturb, this.fullRows, rows, [0, 0]);
       this.fullRows += rows;
       this.lastWork += this.width * rows * f.maxIter;
@@ -273,7 +290,7 @@ export class Renderer {
       this.sampleRows = 0;
       return;
     }
-    const rows = Math.min(this.rowsInBudget(perturb, f.maxIter), this.height - this.sampleRows);
+    const rows = Math.min(this.rowsInBudget(f.maxIter), this.height - this.sampleRows);
     this.lastWork += this.width * rows * f.maxIter;
     const jitter: [number, number] = [halton(this.samples, 2), halton(this.samples, 3)];
     gl.bindFramebuffer(gl.FRAMEBUFFER, acc.fbo);
