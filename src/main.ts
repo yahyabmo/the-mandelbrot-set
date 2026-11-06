@@ -171,9 +171,18 @@ const cycle = $("cycle");
 const cycleSpeed = $<HTMLInputElement>("cycle-speed");
 const smooth = $("smooth");
 
-density.addEventListener("input", () => (state.density = 10 ** Number(density.value)));
-offset.addEventListener("input", () => (state.offset = Number(offset.value)));
-detail.addEventListener("input", () => (state.detail = 2 ** Number(detail.value)));
+density.addEventListener("input", () => {
+  state.density = 10 ** Number(density.value);
+  syncPanel();
+});
+offset.addEventListener("input", () => {
+  state.offset = Number(offset.value);
+  syncPanel();
+});
+detail.addEventListener("input", () => {
+  state.detail = 2 ** Number(detail.value);
+  syncPanel();
+});
 cycleSpeed.addEventListener("input", () => (state.cycleSpeed = Number(cycleSpeed.value)));
 cycle.addEventListener("click", () => {
   state.cycling = !state.cycling;
@@ -212,6 +221,7 @@ function syncPanel(): void {
   detail.value = String(Math.log2(state.detail));
   $("density-out").textContent = `${state.density.toFixed(2)}×`;
   $("offset-out").textContent = state.offset.toFixed(2);
+  $("detail-out").textContent = `${state.detail.toFixed(2)}×`;
   cycle.setAttribute("aria-pressed", String(state.cycling));
   smooth.setAttribute("aria-pressed", String(state.smooth));
 }
