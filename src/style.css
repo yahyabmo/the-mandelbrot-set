@@ -138,7 +138,7 @@ body.ui-hidden .reticle {
   left: var(--gap);
   top: 112px;
   bottom: 252px;
-  width: 46px;
+  width: 56px;
   padding: 10px 0 12px;
   display: grid;
   grid-template-rows: auto 1fr;
@@ -179,7 +179,7 @@ body.ui-hidden .reticle {
 }
 .gauge-mark {
   position: absolute;
-  right: -11px;
+  right: 5px;
   width: 0;
   height: 0;
   border-top: 5px solid transparent;
@@ -187,7 +187,7 @@ body.ui-hidden .reticle {
   border-right: 8px solid var(--accent);
   transform: translateY(-5px);
   transition: top 0.12s linear;
-  filter: drop-shadow(0 0 4px rgba(239, 200, 121, 0.55));
+  filter: drop-shadow(0 0 4px rgba(239, 200, 121, 0.5));
 }
 
 /* ---------- index panel ---------- */
