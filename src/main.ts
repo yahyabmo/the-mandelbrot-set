@@ -8,6 +8,7 @@ import { PLACES, type Place } from "./places";
 import { Renderer, type Status } from "./render/renderer";
 import { Story } from "./story/story";
 import { AutoDive } from "./dive/autodive";
+import { OrbitSound } from "./senses/sound";
 import { coordinateText, magnificationHtml, scientificText, superscript } from "./ui/format";
 import { decode, encode } from "./url";
 
@@ -310,6 +311,14 @@ const dive = new AutoDive({
 });
 $("dive-toggle").addEventListener("click", () => dive.toggle());
 
+const sound = new OrbitSound();
+function toggleSound(): void {
+  const on = sound.toggle();
+  atlas.alwaysRead = on;
+  $("sound-toggle").setAttribute("aria-pressed", String(on));
+}
+$("sound-toggle").addEventListener("click", toggleSound);
+
 /** "#chapter=3" opens the third chapter of the story. */
 const chapterIn = (hash: string) => {
   const m = /^#chapter=(\d+)$/.exec(hash);
@@ -489,6 +498,10 @@ window.addEventListener("keydown", (e) => {
     case "D":
       dive.toggle();
       return;
+    case "m":
+    case "M":
+      toggleSound();
+      return;
     case "c":
     case "C":
       state.cycling = !state.cycling;
@@ -589,6 +602,7 @@ function frame(now: number): void {
   lastStatus = status;
   story.frame();
   dive.frame(now);
+  if (sound.on) sound.setOrbit(atlas.orbitPoints(), atlas.sight().reading);
 
   if (state.captureSince) {
     const ready = status.sharp && (!allowSamples || status.samples >= CAPTURE_SAMPLES);
@@ -650,6 +664,7 @@ requestAnimationFrame(frame);
   story,
   atlas,
   dive,
+  sound,
   /** The current view in plain numbers, for scripts that cannot read bigints. */
   here: () => ({ re: toNumber(state.current.cx), im: toNumber(state.current.cy), width: state.current.width }),
   /** The current centre with every digit. */

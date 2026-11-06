@@ -60,6 +60,8 @@ export class Atlas {
   private lit: Chord | null = null;
   private hovered: Chord | null = null;
   private picks = 0;
+  /** Set while something else, such as the sound, needs the readings with every layer off. */
+  alwaysRead = false;
   /** On a screen without hover, the cross at the centre is the pointer. */
   private touch = matchMedia("(hover: none)").matches;
 
@@ -96,6 +98,11 @@ export class Atlas {
   setLayers(on: Partial<Record<Layer, boolean>>): void {
     Object.assign(this.layers, on);
     this.sync();
+  }
+
+  /** The orbit of the point the atlas reads, for the sound. */
+  orbitPoints(): OrbitPoints | null {
+    return this.orbit;
   }
 
   sight(): AtlasSight {
@@ -142,7 +149,7 @@ export class Atlas {
     const shallow = v.width >= ATLAS_DEPTH;
     const [re, im] = this.pointer ? toComplex(v, this.pointer.x, this.pointer.y, w, h) : [v.cx, v.cy];
     this.probe = [toNumber(re), toNumber(im)];
-    const anything = this.layers.lens || this.layers.component || this.layers.orbit || this.layers.rays;
+    const anything = this.layers.lens || this.layers.component || this.layers.orbit || this.layers.rays || this.alwaysRead;
     const readKey = this.probe.join();
     if (anything && readKey !== this.readKey) {
       this.readKey = readKey;
