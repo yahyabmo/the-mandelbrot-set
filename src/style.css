@@ -765,8 +765,18 @@ body.panel-closed .lens {
   .hint,
   .gauge,
   .scalebar,
-  .lens {
+  .lens-label,
+  .lens-facts {
     display: none;
+  }
+  /* On a phone the lens is small, under the index button, and reads the centre of the view. */
+  .lens,
+  body.panel-closed .lens {
+    top: 62px;
+    right: var(--gap);
+    bottom: auto;
+    width: 132px;
+    padding: 5px;
   }
   .brand {
     padding: 9px 20px 9px 13px;

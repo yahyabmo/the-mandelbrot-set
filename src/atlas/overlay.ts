@@ -21,6 +21,7 @@ export interface OverlayScene {
 
 const INK = "246, 243, 234";
 const BRASS = "#efc879";
+const HALO = "rgba(8, 9, 12, 0.6)";
 const MONO = '500 11px "IBM Plex Mono", ui-monospace, monospace';
 
 export class Overlay {
@@ -58,8 +59,6 @@ export class Overlay {
   private ray(r: OverlayScene["rays"][number], X: (x: number) => number, Y: (y: number) => number, s: OverlayScene): void {
     const g = this.g;
     const p = r.points;
-    g.strokeStyle = r.lit ? BRASS : `rgba(${INK}, ${r.period <= 3 ? 0.5 : r.period === 4 ? 0.3 : 0.17})`;
-    g.lineWidth = r.lit ? 1.8 : r.period <= 3 ? 1.1 : 0.8;
     g.beginPath();
     let lastX = NaN;
     let lastY = NaN;
@@ -73,6 +72,14 @@ export class Overlay {
       lastX = x;
       lastY = y;
     }
+    if (r.lit) {
+      // A dark edge keeps the lit rays legible over the bright filaments.
+      g.strokeStyle = HALO;
+      g.lineWidth = 4;
+      g.stroke();
+    }
+    g.strokeStyle = r.lit ? BRASS : `rgba(${INK}, ${r.period <= 3 ? 0.5 : r.period === 4 ? 0.3 : 0.17})`;
+    g.lineWidth = r.lit ? 1.8 : r.period <= 3 ? 1.1 : 0.8;
     g.stroke();
     if (!r.lit && r.period > 3) return;
     // The label sits on the ray, some way before where it lands.
@@ -88,17 +95,22 @@ export class Overlay {
   }
 
   private component(c: NonNullable<OverlayScene["component"]>, X: (x: number) => number, Y: (y: number) => number, k: number, s: OverlayScene): void {
-    const radius = 0.5 * Math.hypot(c.size[0], c.size[1]) * k;
-    if (radius < 5 || radius > 2 * Math.max(s.wPx, s.hPx)) return;
+    // A little wider than the component, so that the ring surrounds it instead of hiding its edge.
+    const radius = 0.62 * Math.hypot(c.size[0], c.size[1]) * k;
+    // Too small to see, or too large to be read as the component of this view.
+    if (radius < 5 || radius > 0.75 * Math.min(s.wPx, s.hPx)) return;
     const g = this.g;
     const x = X(c.nucleus[0]);
     const y = Y(c.nucleus[1]);
     g.save();
-    g.setLineDash([5, 4]);
-    g.strokeStyle = BRASS;
-    g.lineWidth = 1.2;
     g.beginPath();
     g.arc(x, y, radius, 0, 2 * Math.PI);
+    g.strokeStyle = HALO;
+    g.lineWidth = 4;
+    g.stroke();
+    g.setLineDash([6, 4]);
+    g.strokeStyle = BRASS;
+    g.lineWidth = 1.6;
     g.stroke();
     g.restore();
     g.fillStyle = BRASS;
@@ -162,7 +174,7 @@ export class Overlay {
     const g = this.g;
     g.font = MONO;
     g.lineWidth = 3;
-    g.strokeStyle = "rgba(8, 9, 12, 0.85)";
+    g.strokeStyle = HALO;
     g.strokeText(text, x, y);
     g.fillStyle = colour;
     g.fillText(text, x, y);
