@@ -7,6 +7,7 @@ import { ease, flightPath, HOME_WIDTH, homeView, inSight, MIN_WIDTH, panBy, sett
 import { PLACES, type Place } from "./places";
 import { Renderer, type Status } from "./render/renderer";
 import { Story } from "./story/story";
+import { AutoDive } from "./dive/autodive";
 import { coordinateText, magnificationHtml, scientificText, superscript } from "./ui/format";
 import { decode, encode } from "./url";
 
@@ -49,6 +50,8 @@ const state = {
   detail: initial.detail,
   cycling: false,
   cycleSpeed: 0.12,
+  /** Iterations a view needs at least, beyond the automatic count: set by the endless dive. */
+  minIter: 0,
   smooth: true,
   // A page opened without a link starts on the first place, the whole set.
   place: (initial === defaults ? "home" : null) as string | null,
@@ -282,8 +285,31 @@ const story = new Story({
     syncPanel();
   },
   context: () => ({ reference: lastStatus?.reference ?? "none", width: state.current.width }),
-  changed: () => (urlAt = 0),
+  changed: (index) => {
+    urlAt = 0;
+    if (index !== null) dive.stop();
+  },
 });
+/** Cruising speed of the endless dive, in factors of e per second: slow enough to watch. */
+const DIVE_RATE = 7;
+const dive = new AutoDive({
+  flyTo: (v) => {
+    flyTo(v);
+    state.place = null;
+    inertia = { x: 0, y: 0 };
+    syncPanel();
+  },
+  home: () => homeView(...size()),
+  arrived: () => state.current === state.target && route.length === 0 && lastStatus?.sharp === true,
+  setMinIter: (n) => (state.minIter = n),
+  status: (text) => ($("dive-status").textContent = text),
+  changed: (active) => {
+    $("dive-toggle").setAttribute("aria-pressed", String(active));
+    if (active) story.close();
+  },
+});
+$("dive-toggle").addEventListener("click", () => dive.toggle());
+
 /** "#chapter=3" opens the third chapter of the story. */
 const chapterIn = (hash: string) => {
   const m = /^#chapter=(\d+)$/.exec(hash);
@@ -346,6 +372,7 @@ let inertia = { x: 0, y: 0 };
 let lastMoveTime = 0;
 
 function interacted(): void {
+  dive.stop();
   route = [];
   state.place = null;
   $("hint").classList.add("gone");
@@ -458,6 +485,10 @@ window.addEventListener("keydown", (e) => {
     case "H":
       document.body.classList.toggle("ui-hidden");
       return;
+    case "d":
+    case "D":
+      dive.toggle();
+      return;
     case "c":
     case "C":
       state.cycling = !state.cycling;
@@ -529,7 +560,7 @@ function frame(now: number): void {
   }
   if (route.length && inSight(state.current, route[0])) state.target = route.shift()!;
   if (state.current !== state.target) {
-    state.current = settled(state.current, state.target, w) ? state.target : ease(state.current, state.target, 1 - Math.exp(-dt * 12), zoomRate(Math.log(state.target.width / state.current.width)) * dt);
+    state.current = settled(state.current, state.target, w) ? state.target : ease(state.current, state.target, 1 - Math.exp(-dt * 12), (dive.cruising ? Math.min(DIVE_RATE, zoomRate(Math.log(state.target.width / state.current.width))) : zoomRate(Math.log(state.target.width / state.current.width))) * dt);
   }
   const moving = pointers.size > 0 || gliding || state.current !== state.target;
 
@@ -539,13 +570,13 @@ function frame(now: number): void {
     $("offset-out").textContent = state.offset.toFixed(2);
   }
 
-  const maxIter = autoIterations(state.current.width, state.detail);
+  const maxIter = Math.max(autoIterations(state.current.width, state.detail), state.minIter);
   const allowSamples = state.smooth && !state.cycling;
   const status = renderer.render({
     view: state.current,
     maxIter,
     target: state.target,
-    targetIter: autoIterations(state.target.width, state.detail),
+    targetIter: Math.max(autoIterations(state.target.width, state.detail), state.minIter),
     palette: state.palette,
     period: state.palette.period / state.density,
     offset: state.offset,
@@ -557,6 +588,7 @@ function frame(now: number): void {
   atlas.frame();
   lastStatus = status;
   story.frame();
+  dive.frame(now);
 
   if (state.captureSince) {
     const ready = status.sharp && (!allowSamples || status.samples >= CAPTURE_SAMPLES);
@@ -617,6 +649,7 @@ requestAnimationFrame(frame);
   PLACES,
   story,
   atlas,
+  dive,
   /** The current view in plain numbers, for scripts that cannot read bigints. */
   here: () => ({ re: toNumber(state.current.cx), im: toNumber(state.current.cy), width: state.current.width }),
   /** The current centre with every digit. */
