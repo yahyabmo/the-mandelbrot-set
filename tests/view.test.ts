@@ -14,6 +14,7 @@ import {
   toComplex,
   viewOf,
   zoomAt,
+  zoomRate,
   type View,
 } from "../src/math/view";
 
@@ -115,6 +116,12 @@ describe("view", () => {
 
   it("flies straight to a place already in sight", () => {
     expect(flightPath(HOME, zoomAt(HOME, 300, 200, W, H, 4))).toHaveLength(1);
+  });
+
+  it("dives faster the deeper it goes, within bounds", () => {
+    expect(zoomRate(3)).toBe(8);
+    expect(zoomRate(-90)).toBe(30);
+    expect(zoomRate(690)).toBe(60);
   });
 
   it("limits the speed of a long zoom", () => {

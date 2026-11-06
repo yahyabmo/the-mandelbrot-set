@@ -2,7 +2,7 @@ import "./style.css";
 import { paletteById, paletteCss, PALETTES, type Rgb } from "./color/palettes";
 import { autoIterations } from "./math/iterations";
 import { toDecimal, toNumber } from "./math/fixed";
-import { ease, flightPath, HOME_WIDTH, homeView, inSight, MAX_ZOOM_RATE, MIN_WIDTH, panBy, settled, zoomAt, type View } from "./math/view";
+import { ease, flightPath, HOME_WIDTH, homeView, inSight, MIN_WIDTH, panBy, settled, zoomAt, zoomRate, type View } from "./math/view";
 import { PLACES, type Place } from "./places";
 import { Renderer } from "./render/renderer";
 import { coordinateText, magnificationHtml, scientificText, superscript } from "./ui/format";
@@ -473,7 +473,7 @@ function frame(now: number): void {
   }
   if (route.length && inSight(state.current, route[0])) state.target = route.shift()!;
   if (state.current !== state.target) {
-    state.current = settled(state.current, state.target, w) ? state.target : ease(state.current, state.target, 1 - Math.exp(-dt * 12), MAX_ZOOM_RATE * dt);
+    state.current = settled(state.current, state.target, w) ? state.target : ease(state.current, state.target, 1 - Math.exp(-dt * 12), zoomRate(Math.log(state.target.width / state.current.width)) * dt);
   }
   const moving = pointers.size > 0 || gliding || state.current !== state.target;
 

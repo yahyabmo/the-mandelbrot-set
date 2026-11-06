@@ -65,8 +65,14 @@ export function magnification(v: View): number {
   return HOME_WIDTH / v.width;
 }
 
-/** Fastest change of width while easing, in factors of e per second: 10¹⁸ takes about five seconds. */
-export const MAX_ZOOM_RATE = 8;
+/**
+ * Fastest change of width while easing, in factors of e per second, for a zoom that still
+ * has `gap` factors of e to go: a third of it, between 8 and 60. The dive to 10¹⁸ takes
+ * about five seconds, the one to 10³⁰⁰ under twenty.
+ */
+export function zoomRate(gap: number): number {
+  return Math.min(60, Math.max(8, Math.abs(gap) / 3));
+}
 
 /**
  * Ease `from` towards `to` by a share k of the way, in log space for the width so that
