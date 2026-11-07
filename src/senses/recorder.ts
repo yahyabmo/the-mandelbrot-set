@@ -45,7 +45,8 @@ export async function recordFilm(host: RecordHost, from: View, to: View, o: Film
   if (!(await mb.canEncodeVideo("avc", { width: o.width, height: o.height }))) throw new Error("This browser cannot encode H.264 video.");
   const { renderer, canvas } = host;
   const output = new mb.Output({ format: new mb.Mp4OutputFormat(), target: new mb.BufferTarget() });
-  const source = new mb.CanvasSource(canvas, { codec: "avc", bitrate: mb.QUALITY_HIGH });
+  // A zoom changes every pixel at every frame, over smooth gradients: it needs a generous bitrate.
+  const source = new mb.CanvasSource(canvas, { codec: "avc", bitrate: mb.QUALITY_VERY_HIGH });
   output.addVideoTrack(source, { frameRate: o.fps });
   await output.start();
   const total = Math.round(filmSeconds(from, to) * o.fps);
