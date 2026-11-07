@@ -15,7 +15,7 @@ describe("the Buddhabrot", () => {
   it("draws orbits symmetric about the real axis, shorter ones in fewer channels", () => {
     const grid: Grid = { cx: -0.5, cy: 0, width: 3, w: 60, h: 40 };
     const hist = new Uint32Array(3 * grid.w * grid.h);
-    const drawn = sampleOrbits(grid, 40_000, random(9), hist);
+    const drawn = sampleOrbits(grid, 150_000, random(9), hist);
     expect(drawn).toBeGreaterThan(1000);
     let top = 0;
     let bottom = 0;

@@ -17,6 +17,11 @@ export interface Grid {
 
 /** Escape limits of the three channels, largest first: the first is the length of the orbits. */
 export const LIMITS: [number, number, number] = [5000, 500, 50];
+/**
+ * Orbits that escape sooner start far from the set: their first point is c itself, and
+ * together they would only paint the box the points are drawn from.
+ */
+export const MIN_ESCAPE = 8;
 
 /** True inside the main cardioid or the disc of period 2, whose orbits never escape. */
 export function inBulbs(x: number, y: number): boolean {
@@ -49,7 +54,7 @@ export function sampleOrbits(grid: Grid, count: number, rng: () => number, hist:
       x = nx;
       n++;
     }
-    if (n >= longest) continue;
+    if (n >= longest || n < MIN_ESCAPE) continue;
     drawn++;
     // Which channels this orbit belongs to: those whose limit it escaped within.
     const c1 = n <= limits[1] ? 1 : 0;
