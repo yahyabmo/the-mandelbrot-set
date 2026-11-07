@@ -1,6 +1,6 @@
 # Mandelbrot Odyssey
 
-A real-time journey into the Mandelbrot set, computed live on your graphics card. Scroll into a spiral, fly to the famous places of the set, dive to a magnification of 10³⁰⁰, smoothly, and read the mathematics of what you see in a live atlas: Julia sets, orbits, periods, external rays, and π. Or follow the Odyssey, a story in eight chapters told by the explorer itself, let the endless dive carry you from minibrot to minibrot down to 10²⁰⁰ and beyond, listen to the orbits, and save the dive as a film.
+A real-time journey into the Mandelbrot set, computed live on your graphics card. Scroll into a spiral, fly to the famous places of the set, dive to a magnification of 10³⁰⁰, smoothly, and read the mathematics of what you see in a live atlas: Julia sets, orbits, periods, external rays, and π. Or follow the Odyssey, a story in eight chapters told by the explorer itself, let the endless dive carry you from minibrot to minibrot down to 10²⁰⁰ and beyond, listen to the orbits, and save the dive as a film. Then visit the other worlds: the Burning Ship, the Tricorn, the Multibrots and the Buddhabrot.
 
 ## Installation
 
@@ -54,6 +54,10 @@ npm start
 
 ## Screenshots
 
+![A film made by the explorer: the dive of the 2023 script, from the whole set to 10^18](docs/dive.webp)
+
+*A film made by the explorer itself, with Record a film: the dive of the original script, from the whole set to a magnification of 10¹⁸, one sharp frame at a time.*
+
 ![The whole Mandelbrot set, with the index of places and colours](docs/screenshots/home.jpg)
 
 *The whole set. On the right, the index: places, atlas, palettes, detail. On the left, the depth gauge, from 10⁰ to 10³⁰⁰, and the readout of the engine at work. At the bottom, the lens: the Julia set of the point under the pointer, here c = −3/4.*
@@ -62,9 +66,17 @@ npm start
 
 *The Odyssey, chapter III. The story frames each place in the part of the screen it leaves free, switches on the layers that explain it, and checks its task live: here the pointer has found a bulb of period 5, whose Julia set the lens shows with its five-pointed orbit.*
 
-![The endless dive on a minibrot of period 833, 10^57 times closer](docs/screenshots/dive.jpg)
+![The endless dive on a minibrot of period 487, 10^51 times closer](docs/screenshots/dive.jpg)
 
-*The endless dive, resting on its fifth minibrot: a copy of the whole set, of period 833, 3 × 10⁵⁷ times closer, drawn with 254 900 iterations per pixel. It has already found the next one.*
+*The endless dive, resting on its fifth minibrot: a copy of the whole set, of period 487, 1.8 × 10⁵¹ times closer, drawn with 151 100 iterations per pixel. It has already found the next one.*
+
+![Four other worlds: the Burning Ship, the Tricorn, the Multibrot of z³ and the Buddhabrot](docs/screenshots/worlds.jpg)
+
+*Other worlds. The Burning Ship and its ship, the Tricorn, the Multibrot of z³, and the Buddhabrot, where random orbits that escape are counted point by point: gold for those that take up to 5000 steps, teal up to 500, blue up to 50.*
+
+![Seahorse valley in relief](docs/screenshots/relief.jpg)
+
+*Relief. The smooth count is read as a height map and lit from the upper left, at any depth.*
 
 ![The atlas: the Julia set of the period-3 bulb, its external rays and Lavaurs' diagram](docs/screenshots/atlas.jpg)
 
@@ -108,6 +120,8 @@ npm start
 - **Dive for ever.** The endless dive flies from minibrot to minibrot, each about twice as deep as the last, through the embedded Julia sets between them, down to 10²⁰⁰ and beyond; at the bottom of the map it surfaces and dives again elsewhere. Press <kbd>D</kbd>.
 - **Listen.** With the sound on, the orbit of the point under the pointer becomes a melody: a cycle of period p is a loop of p notes, an escaping orbit glides away. During the dive you hear the nucleus of the minibrot ahead. Press <kbd>M</kbd>.
 - **Make a film.** *Record a film* renders the dive from the whole set to the current view, one sharp frame at a time, as the script of 2023 did, and saves it as an MP4 in Full HD.
+- **Visit other worlds.** The Burning Ship, (|x| + i|y|)² + c, drawn upright as is the custom (click it again to fly to its ship), the Tricorn, z̄² + c, and the Multibrots z³ + c and z⁴ + c, down to a magnification of about 10⁵. And the Buddhabrot, counted live by every core of your processor.
+- **Light it.** *Relief* lights the image as a landscape. Press <kbd>L</kbd>.
 - **Colour it.** Seven palettes, including *Turbo 2023*, the colours of the original script: 150 steps of Turbo, up and back down. Change the density and the shift, or let the colours flow. Colours change instantly, without recomputing the image.
 - **Always smooth.** While you move, the image is computed at a lower resolution that fits in the frame budget. When you stop, it sharpens, then smooths its edges with up to 12 samples per pixel.
 - **Share it.** The address always holds the current view: copy the link and anyone opens the same place, with the same colours. Save the image as a PNG.
@@ -124,6 +138,7 @@ npm start
 | <kbd>1</kbd>–<kbd>9</kbd> | famous places |
 | <kbd>D</kbd> | the endless dive |
 | <kbd>M</kbd> | the sound of orbits |
+| <kbd>L</kbd> | relief |
 | <kbd>C</kbd> | flowing colours |
 | <kbd>S</kbd> | save the image |
 | <kbd>H</kbd> | hide the panels |
@@ -152,6 +167,10 @@ Graphics cards compute in 32-bit floats, which blur the image past a magnificati
 
 **Inside a minibrot.** A reference at a nucleus has an orbit one period long that ends back at 0: the pixels rebase onto its start at each period. Inside the copy, a pixel then comes back to the same offset at every return; two returns that agree to 2⁻²⁰ mark it as inside, and it stops. Outside, near the copy, an orbit makes about one turn of the period for each step the whole set would take, so a view of a deep copy needs hundreds of periods, millions of iterations, which the approximations reduce to a few hundred steps per pixel. The image in motion lowers its iterations when even the smallest preview would be late, and the image at rest batches more rows into each frame when a single row is already as slow as a whole one.
 
+**Other worlds.** The Burning Ship, the Tricorn and the Multibrots change one line of the shader's direct loop, with a smooth count of i − log_d(log₂|z|² / log₂ B²) for a rule of power d. The Buddhabrot is not computed per pixel at all: workers draw random points of the plane, skip those of the cardioid and the big disc, follow the orbits of those that escape and add every point of them to a histogram; the page adds the workers' histograms up twice a second and scales each channel to its brightest few pixels. While the view moves, the counts already made move with it; once it rests, counting starts again on the new view.
+
+**Relief.** The display reads the smooth counts as heights, takes their slope from the four neighbours of each pixel and lights the result, with a touch of shine. It costs no iteration, so it works at every depth.
+
 **Depth.** The limit is a magnification of about 10³⁰⁰, where the size of a pixel stops being an ordinary double.
 
 ```
@@ -166,6 +185,8 @@ src/story/               the eight chapters of the Odyssey and their tasks (test
 src/math/minibrot.ts     the period of a box, nuclei by Newton in fixed point, sizes (tested)
 src/dive/                the plan of the endless dive (tested), its worker, the camera
 src/senses/              the sound of orbits, the films
+src/worlds.ts            the other worlds
+src/buddha/              the Buddhabrot: its sampler (tested), its workers, its display
 src/render/shaders.ts    the same iteration in GLSL, colouring, display
 src/render/reference.ts  which reference to draw with, and when to ask for a new one
 src/render/orbit-worker.ts  deep orbits and their tables, off the page
@@ -193,7 +214,7 @@ The site runs locally. `.github/workflows/ci.yml` runs the tests and the build o
 - [x] **Phase 3.** Atlas: Julia sets and orbits under the pointer, periods and sizes of components, external rays, Lavaurs' diagram, π in seahorse valley.
 - [x] **Phase 4.** Odyssey: an interactive story in eight chapters, driven by the live explorer, with live tasks.
 - [x] **Phase 5.** Senses: the endless dive through embedded Julia sets, the inside of minibrots detected, orbits as sound, films in MP4.
-- [ ] **Phase 6.** Buddhabrot, 3D relief, other fractals.
+- [x] **Phase 6.** The Buddhabrot, relief lighting, the Burning Ship, the Tricorn and the Multibrots.
 
 ## Credits
 
