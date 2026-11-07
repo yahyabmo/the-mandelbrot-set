@@ -1,0 +1,74 @@
+name: Installers
+
+# Install Mandelbrot Odyssey for real, as a user would, on Linux and on Windows: from the folder on a
+# system without Node.js, then from the web with the Node.js of the system.
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install from the folder, on a system without Node.js
+        run: |
+          app=~/.local/share/mandelbrot-odyssey
+          served() { curl -fsS http://localhost:5191/ 2>/dev/null | grep -q "<title>Mandelbrot Odyssey"; }
+          env -i HOME="$HOME" PATH=/usr/sbin:/usr/bin:/sbin:/bin bash install-linux.sh
+          test -x "$app/node/bin/node"
+          test -f ~/.local/share/applications/mandelbrot-odyssey.desktop
+          served
+          "$app/launch.sh" --stop && sleep 1
+          if served; then echo "Mandelbrot Odyssey did not stop"; exit 1; fi
+          "$app/launch.sh"
+          served
+          "$app/uninstall.sh" && sleep 1
+          test ! -e "$app"
+          if served; then echo "Mandelbrot Odyssey still runs"; exit 1; fi
+      - name: Install from the web, with the Node.js of the system
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          app=~/.local/share/mandelbrot-odyssey
+          cat install-linux.sh | bash
+          test ! -e "$app/node"
+          curl -fsS http://localhost:5191/ | grep -q "<title>Mandelbrot Odyssey"
+          "$app/uninstall.sh"
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install from the folder, on a system without Node.js
+        shell: pwsh
+        run: |
+          $app = "$env:LOCALAPPDATA\mandelbrot-odyssey"
+          $link = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Mandelbrot Odyssey.lnk'
+          function Served { try { (Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 http://localhost:5191/).Content -match '<title>Mandelbrot Odyssey' } catch { $false } }
+          $saved = $env:Path
+          $env:Path = "$env:SystemRoot\system32;$env:SystemRoot;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          cmd /c "echo.| install-windows.bat"
+          $env:Path = $saved
+          if (-not (Test-Path "$app\node\node.exe")) { throw 'Node.js was not installed.' }
+          if (-not (Test-Path $link)) { throw 'There is no shortcut on the desktop.' }
+          if (-not (Served)) { throw 'Mandelbrot Odyssey is not served.' }
+          & "$app\launch.cmd" --stop
+          Start-Sleep 1
+          if (Served) { throw 'Mandelbrot Odyssey did not stop.' }
+          & "$app\launch.cmd"
+          if (-not (Served)) { throw 'Mandelbrot Odyssey did not start again.' }
+          & "$app\uninstall.cmd"
+          Start-Sleep 2
+          if ((Test-Path $app) -or (Test-Path $link)) { throw 'Mandelbrot Odyssey was not removed.' }
+          if (Served) { throw 'Mandelbrot Odyssey still runs.' }
+      - name: Install from the web, with the Node.js of the system
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        run: |
+          $app = "$env:LOCALAPPDATA\mandelbrot-odyssey"
+          powershell -NoProfile -Command "Get-Content -Raw install-windows.bat | Invoke-Expression"
+          if (Test-Path "$app\node") { throw 'Node.js was installed although the system has it.' }
+          if ((Invoke-WebRequest -UseBasicParsing http://localhost:5191/).Content -notmatch '<title>Mandelbrot Odyssey') { throw 'Mandelbrot Odyssey is not served.' }
+          & "$app\uninstall.cmd"
